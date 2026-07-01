@@ -1,0 +1,19 @@
+{
+  "name": "intoacec-dashboard",
+  "version": "1.0.0",
+  "description": "IntoAEC Social Media Analytics Dashboard",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "fetch": "node analytics.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "exceljs": "^4.4.0",
+    "express": "^4.19.2",
+    "googleapis": "^140.0.1"
+  }
+}

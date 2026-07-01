@@ -1,0 +1,2565 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IntoAEC — Social Media Analytics Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=DM+Mono:wght@400;500&family=Sora:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        :root {
+            --primary: #0066cc;
+            --primary-light: #e8f2ff;
+            --primary-mid: #cce0ff;
+            --teal: #00cccc;
+            --teal-light: #e0fafa;
+            --teal-mid: #b3f0f0;
+            --white: #ffffff;
+            --bg: #f5f7fb;
+            --bg2: #eef1f7;
+            --border: #dde3ef;
+            --border-light: #eef1f7;
+            --text: #0d1a2e;
+            --text2: #3a4a62;
+            --muted: #7080a0;
+            --muted2: #a0aec0;
+            --up: #12b47a;
+            --up-bg: #e6faf3;
+            --down: #e5403c;
+            --down-bg: #fdf0ef;
+            --warn: #f59e0b;
+            --warn-bg: #fef3c7;
+            --neutral: #6b7a99;
+            --neutral-bg: #f0f2f7;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --shadow: 0 1px 3px rgba(0, 102, 204, .06), 0 4px 16px rgba(0, 102, 204, .04);
+            --shadow-hover: 0 4px 12px rgba(0, 102, 204, .12), 0 8px 32px rgba(0, 102, 204, .07);
+            --font: 'DM Sans', sans-serif;
+            --font-display: 'Sora', sans-serif;
+            --font-mono: 'DM Mono', monospace;
+            --primary-text: var(--primary);
+            --teal-text: #007a7a;
+            --warn-text: #92400e;
+            --down-text: var(--down);
+            --kpi-grad-1: linear-gradient(135deg, var(--primary), #0052aa);
+            --kpi-grad-2: linear-gradient(135deg, var(--teal), #009999);
+            --kpi-grad-3: linear-gradient(135deg, #0055b3, var(--primary));
+            --kpi-grad-4: linear-gradient(135deg, #007ab5, var(--teal));
+            --kpi-grad-5: linear-gradient(135deg, #005fa3, #0099bb);
+            --li-blue: #0a66c2;
+            --li-blue-light: #e8f2ff;
+            --li-blue-mid: #c3dcf5;
+            --li-blue-dark: #004182;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 14px;
+            line-height: 1.5;
+        }
+
+        div,
+        span,
+        table,
+        tr,
+        td,
+        th,
+        button,
+        select,
+        input {
+            transition: background-color .25s, color .25s, border-color .25s, box-shadow .25s;
+        }
+
+        .header {
+            background: var(--white);
+            border-bottom: 1px solid var(--border);
+            padding: 0 32px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            height: 64px;
+            position: sticky;
+            top: 0;
+            z-index: 200;
+            box-shadow: 0 2px 8px rgba(0, 102, 204, .05);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .brand-logo {
+            font-family: var(--font-display);
+            font-weight: 700;
+            font-size: 18px;
+            color: var(--primary);
+            letter-spacing: -.02em;
+        }
+
+        .header-divider {
+            width: 1px;
+            height: 28px;
+            background: var(--border);
+        }
+
+        .header-title {
+            font-family: var(--font-display);
+            font-weight: 600;
+            font-size: 15px;
+            color: var(--text);
+            letter-spacing: -.01em;
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-badge {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 500;
+            letter-spacing: .08em;
+            color: var(--primary);
+            background: var(--primary-light);
+            border: 1px solid var(--primary-mid);
+            padding: 4px 10px;
+            border-radius: 20px;
+            text-transform: uppercase;
+        }
+
+        .refresh-btn {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            font-family: var(--font-mono);
+            font-size: 11.5px;
+            font-weight: 600;
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: 1px solid var(--primary);
+            background: linear-gradient(135deg, var(--primary), #0052aa);
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 102, 204, .25);
+        }
+
+        .refresh-btn:hover {
+            box-shadow: 0 4px 14px rgba(0, 102, 204, .35);
+            transform: translateY(-1px);
+        }
+
+        .refresh-btn:disabled {
+            opacity: .6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .spin {
+            display: inline-block;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from {
+                transform: rotate(0deg);
+            }
+
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .last-updated {
+            font-family: var(--font-mono);
+            font-size: 10.5px;
+            color: var(--muted);
+            white-space: nowrap;
+        }
+
+        .data-source-pill {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 20px;
+            white-space: nowrap;
+        }
+
+        .source-waiting {
+            background: var(--neutral-bg);
+            color: var(--neutral);
+            border: 1px solid var(--border);
+        }
+
+        .source-live {
+            background: var(--up-bg);
+            color: var(--up);
+            border: 1px solid var(--up);
+        }
+
+        .source-error {
+            background: var(--down-bg);
+            color: var(--down);
+            border: 1px solid var(--down);
+        }
+
+        .refresh-toast {
+            position: fixed;
+            top: 74px;
+            right: 32px;
+            z-index: 500;
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 12px 18px;
+            box-shadow: var(--shadow-hover);
+            font-size: 12.5px;
+            color: var(--text2);
+            max-width: 360px;
+            display: none;
+        }
+
+        .refresh-toast.show {
+            display: block;
+        }
+
+        .refresh-toast.error {
+            border-color: var(--down);
+            color: var(--down-text);
+        }
+
+        .filter-bar {
+            background: var(--white);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 32px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            position: sticky;
+            top: 64px;
+            z-index: 150;
+            box-shadow: 0 1px 4px rgba(0, 102, 204, .04);
+            flex-wrap: wrap;
+        }
+
+        .filter-label {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            white-space: nowrap;
+        }
+
+        .filter-pills {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .fpill {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 5px 13px;
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            background: var(--white);
+            color: var(--text2);
+            cursor: pointer;
+            transition: all .18s;
+            white-space: nowrap;
+        }
+
+        .fpill:hover {
+            background: var(--primary-light);
+            color: var(--primary);
+            border-color: var(--primary-mid);
+        }
+
+        .fpill.active {
+            background: linear-gradient(135deg, var(--primary), #3b82f6);
+            color: #fff;
+            border-color: var(--primary);
+            box-shadow: 0 2px 8px rgba(0, 102, 204, .25);
+        }
+
+        .filter-divider {
+            width: 1px;
+            height: 22px;
+            background: var(--border);
+        }
+
+        .custom-range-wrap {
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .custom-range-wrap.visible {
+            display: flex;
+        }
+
+        .date-input {
+            border: 1px solid var(--border);
+            border-radius: 999px;
+            padding: 5px 10px;
+            font-size: 11px;
+            font-family: var(--font-mono);
+            background: var(--white);
+            color: var(--text2);
+            outline: none;
+        }
+
+        .date-input:focus {
+            border-color: var(--primary);
+        }
+
+        .filter-info {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--muted);
+            margin-left: auto;
+        }
+
+        .apply-btn {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 20px;
+            border: 1px solid var(--primary-mid);
+            background: var(--primary-light);
+            color: var(--primary);
+            cursor: pointer;
+            transition: all .18s;
+        }
+
+        .apply-btn:hover {
+            background: var(--primary);
+            color: #fff;
+        }
+
+        .nav-bar {
+            background: var(--white);
+            border-bottom: 1px solid var(--border);
+            padding: 0 32px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+            overflow-x: auto;
+            position: sticky;
+            top: 108px;
+            z-index: 100;
+        }
+
+        .nav-tab {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            padding: 14px 16px 12px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--muted);
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all .2s;
+            white-space: nowrap;
+            user-select: none;
+            flex-shrink: 0;
+        }
+
+        .nav-tab:hover {
+            color: var(--primary);
+            background: var(--primary-light);
+        }
+
+        .nav-tab.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+            font-weight: 600;
+        }
+
+        .tab-icon {
+            font-size: 15px;
+            opacity: .7;
+        }
+
+        .nav-tab.active .tab-icon {
+            opacity: 1;
+        }
+
+        .content {
+            max-width: 1320px;
+            margin: 0 auto;
+            padding: 28px 32px 60px;
+        }
+
+        .tab-panel {
+            display: none;
+            animation: fadeUp .35s ease both;
+        }
+
+        .tab-panel.active {
+            display: block;
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Empty state */
+        .empty-state {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 80px 32px;
+            text-align: center;
+        }
+
+        .empty-state .es-icon {
+            font-size: 48px;
+            margin-bottom: 16px;
+        }
+
+        .empty-state h3 {
+            font-family: var(--font-display);
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 8px;
+        }
+
+        .empty-state p {
+            font-size: 13px;
+            color: var(--muted);
+            line-height: 1.6;
+            max-width: 420px;
+        }
+
+        .empty-state .es-btn {
+            margin-top: 20px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 20px;
+            border: 1px solid var(--primary);
+            background: linear-gradient(135deg, var(--primary), #0052aa);
+            color: #fff;
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(0, 102, 204, .25);
+        }
+
+        .empty-state .es-btn:hover {
+            box-shadow: 0 4px 14px rgba(0, 102, 204, .35);
+            transform: translateY(-1px);
+        }
+
+        .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .section-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            flex-shrink: 0;
+        }
+
+        .icon-ga {
+            background: linear-gradient(135deg, var(--primary-light), var(--primary-mid));
+        }
+
+        .icon-fb {
+            background: linear-gradient(135deg, #e8efff, #c8d8ff);
+        }
+
+        .icon-ig {
+            background: linear-gradient(135deg, #fff0f8, #ffd6ee);
+        }
+
+        .icon-yt {
+            background: linear-gradient(135deg, #fff0f0, #ffd0d0);
+        }
+
+        .icon-ov {
+            background: linear-gradient(135deg, #f0f8ff, #d0e8ff);
+        }
+
+        .icon-wk {
+            background: linear-gradient(135deg, #f0fff4, #d0ffe0);
+        }
+
+        .icon-li {
+            background: linear-gradient(135deg, #e8f2ff, #c3dcf5);
+        }
+
+        .c-li::before {
+            background: linear-gradient(90deg, var(--li-blue), #1b8fe0);
+        }
+
+        .section-title-block h2 {
+            font-family: var(--font-display);
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -.01em;
+        }
+
+        .section-title-block p {
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 1px;
+            font-family: var(--font-mono);
+        }
+
+        .section-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border);
+        }
+
+        .range-tag {
+            font-family: var(--font-mono);
+            font-size: 10px;
+            font-weight: 600;
+            padding: 3px 9px;
+            border-radius: 20px;
+            background: var(--primary-light);
+            color: var(--primary);
+            border: 1px solid var(--primary-mid);
+            white-space: nowrap;
+        }
+
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .metric-card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            position: relative;
+            overflow: hidden;
+            transition: box-shadow .2s, transform .2s;
+        }
+
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            border-radius: var(--radius) var(--radius) 0 0;
+        }
+
+        .metric-card.c-primary::before {
+            background: linear-gradient(90deg, var(--primary), #0099cc);
+        }
+
+        .metric-card.c-teal::before {
+            background: linear-gradient(90deg, var(--teal), #00aaaa);
+        }
+
+        .metric-card.c-up::before {
+            background: linear-gradient(90deg, var(--up), #0fce8c);
+        }
+
+        .metric-card.c-warn::before {
+            background: linear-gradient(90deg, var(--warn), #fbbf24);
+        }
+
+        .metric-card.c-down::before {
+            background: linear-gradient(90deg, var(--down), #f87171);
+        }
+
+        .metric-card:hover {
+            box-shadow: var(--shadow-hover);
+            transform: translateY(-1px);
+        }
+
+        .metric-label {
+            font-size: 11.5px;
+            font-weight: 500;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 8px;
+        }
+
+        .metric-value {
+            font-family: var(--font-display);
+            font-size: 26px;
+            font-weight: 700;
+            color: var(--text);
+            letter-spacing: -.02em;
+            line-height: 1;
+            margin-bottom: 8px;
+        }
+
+        .metric-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 6px;
+        }
+
+        .metric-delta {
+            font-size: 12px;
+            font-weight: 600;
+            padding: 2px 7px;
+            border-radius: 20px;
+            font-family: var(--font-mono);
+        }
+
+        .delta-up {
+            color: var(--up);
+            background: var(--up-bg);
+        }
+
+        .delta-down {
+            color: var(--down);
+            background: var(--down-bg);
+        }
+
+        .delta-neutral {
+            color: var(--neutral);
+            background: var(--neutral-bg);
+        }
+
+        .metric-bench {
+            font-size: 11px;
+            color: var(--muted2);
+            font-family: var(--font-mono);
+        }
+
+        .kpi-strip {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .kpi-strip-card {
+            border-radius: var(--radius);
+            padding: 16px;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, .08);
+            box-shadow: var(--shadow);
+            transition: transform .25s, box-shadow .25s;
+        }
+
+        .kpi-strip-card:nth-child(1) {
+            background: var(--kpi-grad-1);
+        }
+
+        .kpi-strip-card:nth-child(2) {
+            background: var(--kpi-grad-2);
+        }
+
+        .kpi-strip-card:nth-child(3) {
+            background: var(--kpi-grad-3);
+        }
+
+        .kpi-strip-card:nth-child(4) {
+            background: var(--kpi-grad-4);
+        }
+
+        .kpi-strip-card:nth-child(5) {
+            background: var(--kpi-grad-5);
+        }
+
+        .kpi-strip-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 102, 204, .25);
+        }
+
+        .kpi-strip-label {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            opacity: .8;
+            margin-bottom: 8px;
+            font-family: var(--font-mono);
+        }
+
+        .kpi-strip-val {
+            font-family: var(--font-display);
+            font-size: 22px;
+            font-weight: 700;
+            letter-spacing: -.02em;
+            line-height: 1;
+            margin-bottom: 4px;
+        }
+
+        .kpi-strip-delta {
+            font-size: 11px;
+            opacity: .9;
+            font-family: var(--font-mono);
+        }
+
+        .chart-row {
+            display: grid;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .two-col {
+            grid-template-columns: 1fr 1fr;
+        }
+
+        .two-col>* {
+            min-width: 0;
+        }
+
+        .three-col {
+            grid-template-columns: repeat(3, 1fr);
+        }
+
+        .three-col>* {
+            min-width: 0;
+        }
+
+        .four-col {
+            grid-template-columns: repeat(4, 1fr);
+        }
+
+        .four-col>* {
+            min-width: 0;
+        }
+
+        .col-2-1 {
+            grid-template-columns: 2fr 1fr;
+        }
+
+        .col-2-1>* {
+            min-width: 0;
+        }
+
+        .col-1-2 {
+            grid-template-columns: 1fr 2fr;
+        }
+
+        .col-1-2>* {
+            min-width: 0;
+        }
+
+        .card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            transition: box-shadow .2s;
+        }
+
+        .card:hover {
+            box-shadow: var(--shadow-hover);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+        }
+
+        .card-title {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            letter-spacing: -.01em;
+        }
+
+        .card-subtitle {
+            font-size: 11px;
+            color: var(--muted);
+            font-family: var(--font-mono);
+        }
+
+        .chart-wrap {
+            position: relative;
+            width: 100%;
+        }
+
+        .chart-wrap canvas {
+            display: block;
+        }
+
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12.5px;
+        }
+
+        .data-table th {
+            font-size: 11px;
+            font-weight: 500;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .05em;
+            padding: 8px 12px;
+            border-bottom: 1px solid var(--border);
+            text-align: left;
+            white-space: nowrap;
+            background: var(--bg);
+        }
+
+        .data-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border-light);
+            color: var(--text2);
+            vertical-align: middle;
+        }
+
+        .data-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tr:hover td {
+            background: var(--bg);
+        }
+
+        .rank-badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            font-size: 11px;
+            font-weight: 600;
+            background: var(--primary-light);
+            color: var(--primary);
+            font-family: var(--font-mono);
+        }
+
+        .page-name {
+            font-weight: 500;
+            color: var(--text);
+            font-family: var(--font-mono);
+            font-size: 11px;
+        }
+
+        .pill {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 600;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-family: var(--font-mono);
+        }
+
+        .type-badge {
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: var(--font-mono);
+        }
+
+        .type-video {
+            background: #fff0f0;
+            color: #c0392b;
+        }
+
+        .type-photo {
+            background: var(--primary-light);
+            color: var(--primary);
+        }
+
+        .type-reel {
+            background: #f5f0ff;
+            color: #7c3aed;
+        }
+
+        .type-feed {
+            background: var(--teal-light);
+            color: var(--teal-text);
+        }
+
+        .type-share {
+            background: var(--up-bg);
+            color: var(--up);
+        }
+
+        .type-short {
+            background: #fff8e6;
+            color: #b45309;
+        }
+
+        .type-long {
+            background: #e8f2ff;
+            color: #0066cc;
+        }
+
+        .info-box {
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            font-size: 11.5px;
+            line-height: 1.6;
+            margin-top: 10px;
+        }
+
+        .info-box-blue {
+            background: var(--primary-light);
+            color: var(--primary-text);
+        }
+
+        .info-box-teal {
+            background: var(--teal-light);
+            color: var(--teal-text);
+        }
+
+        .info-box-warn {
+            background: var(--warn-bg);
+            color: var(--warn-text);
+        }
+
+        .bench-list {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bench-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 9px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .bench-row:last-child {
+            border-bottom: none;
+        }
+
+        .bench-label {
+            font-size: 12px;
+            color: var(--text2);
+            flex: 1;
+        }
+
+        .bench-track {
+            width: 100px;
+            height: 5px;
+            background: var(--bg2);
+            border-radius: 3px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .bench-fill {
+            height: 100%;
+            border-radius: 3px;
+        }
+
+        .fill-primary {
+            background: linear-gradient(90deg, var(--primary), var(--teal));
+        }
+
+        .fill-up {
+            background: var(--up);
+        }
+
+        .fill-warn {
+            background: var(--warn);
+        }
+
+        .fill-down {
+            background: var(--down);
+        }
+
+        .bench-val {
+            font-family: var(--font-mono);
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--text);
+            min-width: 52px;
+            text-align: right;
+        }
+
+        .obs-card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 14px 16px;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            margin-bottom: 10px;
+            transition: box-shadow .2s;
+        }
+
+        .obs-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .obs-card:hover {
+            box-shadow: var(--shadow-hover);
+        }
+
+        .obs-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            flex-shrink: 0;
+        }
+
+        .obs-up .obs-icon {
+            background: var(--up-bg);
+        }
+
+        .obs-down .obs-icon {
+            background: var(--down-bg);
+        }
+
+        .obs-neutral .obs-icon {
+            background: var(--primary-light);
+        }
+
+        .obs-warn .obs-icon {
+            background: var(--warn-bg);
+        }
+
+        .obs-text h4 {
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+            margin-bottom: 3px;
+        }
+
+        .obs-text p {
+            font-size: 12px;
+            color: var(--text2);
+            line-height: 1.5;
+        }
+
+        .notice-bar {
+            background: var(--primary-light);
+            border: 1px solid var(--primary-mid);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            font-size: 12px;
+            color: var(--primary-text);
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .no-data {
+            text-align: center;
+            padding: 32px;
+            color: var(--muted);
+            font-size: 13px;
+            font-family: var(--font-mono);
+        }
+
+        .dash-footer {
+            margin-top: 48px;
+            padding-top: 20px;
+            border-top: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--muted2);
+            font-family: var(--font-mono);
+        }
+
+        .wk-card {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .wk-card-head {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .wk-card-head .wk-icon {
+            font-size: 18px;
+        }
+
+        .wk-card-head h3 {
+            font-family: var(--font-display);
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .wk-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-light);
+        }
+
+        .wk-row:last-child {
+            border-bottom: none;
+        }
+
+        .wk-metric-name {
+            font-size: 12px;
+            color: var(--text2);
+        }
+
+        .wk-values {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .wk-val-this {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .wk-val-prev {
+            font-family: var(--font-mono);
+            font-size: 11px;
+            color: var(--muted2);
+        }
+
+        .wk-delta {
+            font-size: 11px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-family: var(--font-mono);
+            min-width: 54px;
+            text-align: center;
+        }
+
+        @media(max-width:1024px) {
+            .kpi-strip {
+                grid-template-columns: repeat(3, 1fr);
+            }
+
+            .two-col,
+            .col-2-1,
+            .col-1-2,
+            .three-col,
+            .four-col {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media(max-width:600px) {
+            .kpi-strip {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .metric-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .filter-bar {
+                top: 54px;
+            }
+
+            .nav-bar {
+                top: 100px;
+            }
+
+            .header {
+                padding: 0 16px;
+                height: 54px;
+            }
+
+            .content {
+                padding: 16px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="header">
+        <div class="header-left">
+            <span class="brand-logo">IntoAEC</span>
+            <div class="header-divider"></div>
+            <span class="header-title">Social Media Analytics</span>
+        </div>
+        <div class="header-right">
+            <span class="data-source-pill source-waiting" id="dataSourcePill">⏳ No Data Yet</span>
+            <span class="last-updated" id="lastUpdated"></span>
+            <button class="refresh-btn" id="refreshBtn">🔄 <span id="refreshLabel">Refresh Live Data</span></button>
+            <span class="header-badge" id="headerRangeLabel">📅 Last 31 Days</span>
+        </div>
+    </div>
+
+    <div class="refresh-toast" id="refreshToast"></div>
+
+    <div class="filter-bar">
+        <span class="filter-label">📅 Date Range</span>
+        <div class="filter-pills">
+            <button class="fpill" data-days="7">Last 7 Days</button>
+            <button class="fpill" data-days="14">Last 14 Days</button>
+            <button class="fpill active" data-days="31">Last 31 Days</button>
+            <button class="fpill" data-days="90">Last 90 Days</button>
+            <button class="fpill" data-days="all">All Time</button>
+            <button class="fpill" data-days="custom">Custom</button>
+        </div>
+        <div class="filter-divider"></div>
+        <div class="custom-range-wrap" id="customRangeWrap">
+            <span style="font-size:11px;font-family:var(--font-mono);color:var(--muted);">From</span>
+            <input type="date" class="date-input" id="customStart">
+            <span style="font-size:11px;font-family:var(--font-mono);color:var(--muted);">To</span>
+            <input type="date" class="date-input" id="customEnd">
+            <button class="apply-btn" id="applyCustom">Apply</button>
+        </div>
+        <span class="filter-info" id="filterInfo">Showing last 31 days</span>
+    </div>
+
+    <div class="nav-bar">
+        <div class="nav-tab active" data-tab="overview"><span class="tab-icon">🏠</span>Overview</div>
+        <div class="nav-tab" data-tab="ga"><span class="tab-icon">🌐</span>Google Analytics</div>
+        <div class="nav-tab" data-tab="fb"><span class="tab-icon">📘</span>Facebook</div>
+        <div class="nav-tab" data-tab="ig"><span class="tab-icon">📸</span>Instagram</div>
+        <div class="nav-tab" data-tab="yt"><span class="tab-icon">▶️</span>YouTube</div>
+        <div class="nav-tab" data-tab="weekly"><span class="tab-icon">📊</span>Weekly Comparison</div>
+    </div>
+
+    <div class="content">
+
+        <!-- OVERVIEW -->
+        <section class="tab-panel active" id="tab-overview">
+            <div id="overviewEmpty" class="empty-state">
+                <div class="es-icon">📊</div>
+                <h3>No live data loaded yet</h3>
+                <p>Click <strong>Refresh Live Data</strong> to pull real data from Facebook, Instagram, Google
+                    Analytics, and YouTube.</p>
+                <button class="es-btn" onclick="document.getElementById('refreshBtn').click()">🔄 Refresh Live
+                    Data</button>
+            </div>
+            <div id="overviewContent" style="display:none;">
+                <div class="section-header">
+                    <div class="section-icon icon-ov">📊</div>
+                    <div class="section-title-block">
+                        <h2>Cross-Channel Overview</h2>
+                        <p>Facebook · Instagram · Google Analytics · YouTube</p>
+                    </div>
+                    <div class="section-line"></div>
+                    <span class="range-tag" id="ovRangeTag">Last 31 Days</span>
+                </div>
+                <div class="kpi-strip">
+                    <div class="kpi-strip-card">
+                        <div class="kpi-strip-label">GA4 Active Users</div>
+                        <div class="kpi-strip-val" id="kpi-users">—</div>
+                        <div class="kpi-strip-delta" id="kpi-users-sub">—</div>
+                    </div>
+                    <div class="kpi-strip-card">
+                        <div class="kpi-strip-label">IG Followers</div>
+                        <div class="kpi-strip-val" id="kpi-ig-followers">—</div>
+                        <div class="kpi-strip-delta" id="kpi-ig-sub">—</div>
+                    </div>
+                    <div class="kpi-strip-card">
+                        <div class="kpi-strip-label">FB Page Fans</div>
+                        <div class="kpi-strip-val" id="kpi-fb-fans">—</div>
+                        <div class="kpi-strip-delta" id="kpi-fb-sub">—</div>
+                    </div>
+                    <div class="kpi-strip-card">
+                        <div class="kpi-strip-label">YT Videos (Filtered)</div>
+                        <div class="kpi-strip-val" id="kpi-yt-videos">—</div>
+                        <div class="kpi-strip-delta" id="kpi-yt-sub">—</div>
+                    </div>
+                    <div class="kpi-strip-card">
+                        <div class="kpi-strip-label">GA4 Page Views</div>
+                        <div class="kpi-strip-val" id="kpi-views">—</div>
+                        <div class="kpi-strip-delta" id="kpi-views-sub">—</div>
+                    </div>
+                </div>
+                <div class="chart-row two-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">GA4 Daily Active Users & Page Views</div>
+                                <div class="card-subtitle" id="ovChartSub">—</div>
+                            </div>
+                        </div>
+                        <div class="chart-wrap" style="height:240px;"><canvas id="overviewUsersChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Traffic Channels</div>
+                                <div class="card-subtitle">Session distribution by acquisition source</div>
+                            </div>
+                        </div>
+                        <div class="chart-wrap" style="height:240px;"><canvas id="overviewChannelChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="chart-row three-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Instagram — Top Posts</div>
+                            <div class="card-subtitle" id="igSubOv">—</div>
+                        </div>
+                        <div class="chart-wrap" style="height:200px;"><canvas id="igEngChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Facebook Post Types</div>
+                            <div class="card-subtitle" id="fbSubOv">—</div>
+                        </div>
+                        <div class="chart-wrap" style="height:200px;"><canvas id="fbTypeChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Platform Audience</div>
+                            <div class="card-subtitle">Total audience size</div>
+                        </div>
+                        <div class="chart-wrap" style="height:200px;"><canvas id="audienceChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="chart-row two-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Key Observations</div>
+                            <div class="card-subtitle">Cross-platform signals</div>
+                        </div>
+                        <div id="observationsContent"></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Top GA4 Pages</div>
+                            <div class="card-subtitle">By total views — all time</div>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Page</th>
+                                    <th>Views</th>
+                                    <th>Avg Time</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ovTopPagesTable"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- GOOGLE ANALYTICS -->
+        <section class="tab-panel" id="tab-ga">
+            <div id="gaEmpty" class="empty-state">
+                <div class="es-icon">🌐</div>
+                <h3>No GA4 data loaded</h3>
+                <p>Click Refresh Live Data to pull Google Analytics metrics.</p>
+                <button class="es-btn" onclick="document.getElementById('refreshBtn').click()">🔄 Refresh Live
+                    Data</button>
+            </div>
+            <div id="gaContent" style="display:none;">
+                <div class="section-header">
+                    <div class="section-icon icon-ga">🌐</div>
+                    <div class="section-title-block">
+                        <h2>Google Analytics 4</h2>
+                        <p>IntoAEC Website · All users</p>
+                    </div>
+                    <div class="section-line"></div>
+                    <span class="range-tag" id="gaRangeTag">Last 31 Days</span>
+                </div>
+                <div class="metric-grid" style="grid-template-columns:repeat(5,1fr);">
+                    <div class="metric-card c-primary">
+                        <div class="metric-label">Active Users</div>
+                        <div class="metric-value" id="ga-users">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-neutral"
+                                id="ga-users-d">—</span><span class="metric-bench">GA4 filtered</span></div>
+                    </div>
+                    <div class="metric-card c-teal">
+                        <div class="metric-label">New Users</div>
+                        <div class="metric-value" id="ga-new">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-up" id="ga-new-pct">—</span><span
+                                class="metric-bench">of total users</span></div>
+                    </div>
+                    <div class="metric-card c-warn">
+                        <div class="metric-label">Page Views</div>
+                        <div class="metric-value" id="ga-pv">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-neutral" id="ga-pv-d">—</span><span
+                                class="metric-bench">GA4 filtered</span></div>
+                    </div>
+                    <div class="metric-card c-up">
+                        <div class="metric-label">Sessions</div>
+                        <div class="metric-value" id="ga-sess">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-up" id="ga-sess-d">—</span><span
+                                class="metric-bench">avg sessions</span></div>
+                    </div>
+                    <div class="metric-card c-teal">
+                        <div class="metric-label">Conversions</div>
+                        <div class="metric-value" id="ga-conv">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-up" id="ga-conv-d">—</span><span
+                                class="metric-bench">conversion rate</span></div>
+                    </div>
+                </div>
+                <div class="chart-row col-2-1">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Daily Active Users & Page Views</div>
+                                <div class="card-subtitle" id="gaDailySub">—</div>
+                            </div>
+                        </div>
+                        <div class="chart-wrap" style="height:260px;"><canvas id="gaDailyChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Avg Session Duration</div>
+                            <div class="card-subtitle">Top days by engagement (s)</div>
+                        </div>
+                        <div class="chart-wrap" style="height:260px;"><canvas id="gaSessionDurChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="chart-row col-1-2">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Traffic by Channel</div>
+                            <div class="card-subtitle">Acquisition sources</div>
+                        </div>
+                        <div class="chart-wrap" style="height:260px;"><canvas id="gaChannelDoughnut"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Channel Session Breakdown</div>
+                            <div class="card-subtitle">Sessions by acquisition channel</div>
+                        </div>
+                        <div class="chart-wrap" style="height:260px;"><canvas id="gaChannelBar"></canvas></div>
+                    </div>
+                </div>
+                <div class="card" style="margin-bottom:20px;">
+                    <div class="card-header">
+                        <div>
+                            <div class="card-title">Top 15 Pages by Views</div>
+                            <div class="card-subtitle">All-time data</div>
+                        </div>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Page Path</th>
+                                <th>Title</th>
+                                <th>Views</th>
+                                <th>Avg Duration</th>
+                            </tr>
+                        </thead>
+                        <tbody id="gaTopPagesTable"></tbody>
+                    </table>
+                    <div class="no-data" id="gaPagesNoData" style="display:none;">No page-view data available for this
+                        property</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FACEBOOK -->
+        <section class="tab-panel" id="tab-fb">
+            <div id="fbEmpty" class="empty-state">
+                <div class="es-icon">📘</div>
+                <h3>No Facebook data loaded</h3>
+                <p>Click Refresh Live Data to pull Facebook page metrics and posts.</p>
+                <button class="es-btn" onclick="document.getElementById('refreshBtn').click()">🔄 Refresh Live
+                    Data</button>
+            </div>
+            <div id="fbContent" style="display:none;">
+                <div class="section-header">
+                    <div class="section-icon icon-fb">📘</div>
+                    <div class="section-title-block">
+                        <h2>Facebook — IntoAEC Page</h2>
+                        <p id="fbSubtitle">@intoaec</p>
+                    </div>
+                    <div class="section-line"></div>
+                    <span class="range-tag" id="fbRangeTag">Last 31 Days</span>
+                </div>
+                <div class="metric-grid" style="grid-template-columns:repeat(5,1fr);">
+                    <div class="metric-card c-primary">
+                        <div class="metric-label">Page Fans</div>
+                        <div class="metric-value" id="fb-fans">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-neutral"
+                                id="fb-followers">—</span><span class="metric-bench">followers</span></div>
+                    </div>
+                    <div class="metric-card c-teal">
+                        <div class="metric-label">Media Views (Filtered)</div>
+                        <div class="metric-value" id="fb-mediaviews">—</div>
+                        <div class="metric-footer"><span class="metric-delta"
+                                style="color:var(--warn);background:var(--warn-bg);">Reach: API-limited</span><span
+                                class="metric-bench">filtered range</span></div>
+                    </div>
+                    <div class="metric-card c-up">
+                        <div class="metric-label">Likes (Filtered)</div>
+                        <div class="metric-value" id="fb-likes">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-neutral"
+                                id="fb-likes-d">—</span><span class="metric-bench">total likes</span></div>
+                    </div>
+                    <div class="metric-card c-warn">
+                        <div class="metric-label">Comments (Filtered)</div>
+                        <div class="metric-value" id="fb-comments">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-neutral"
+                                id="fb-comments-d">—</span><span class="metric-bench">total comments</span></div>
+                    </div>
+                    <div class="metric-card c-teal">
+                        <div class="metric-label">Posts (Filtered)</div>
+                        <div class="metric-value" id="fb-posts-count">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-up" id="fb-posts-d">in
+                                range</span><span class="metric-bench">posts published</span></div>
+                    </div>
+                </div>
+                <div class="chart-row two-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Post Types — Filtered Range</div>
+                                <div class="card-subtitle" id="fbTypeChartSub">—</div>
+                            </div>
+                        </div>
+                        <div class="chart-wrap" style="height:240px;"><canvas id="fbPostTypeChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Top Posts by Likes — Filtered</div>
+                                <div class="card-subtitle" id="fbTopChartSub">—</div>
+                            </div>
+                        </div>
+                        <div class="chart-wrap" style="height:240px;"><canvas id="fbTopPostsChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="chart-row col-2-1">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Posts Table — Filtered Range</div>
+                                <div class="card-subtitle" id="fbTableSub">—</div>
+                            </div>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Likes</th>
+                                    <th>Comments</th>
+                                    <th>Shares</th>
+                                    <th>Media Views</th>
+                                </tr>
+                            </thead>
+                            <tbody id="fbPostsTable"></tbody>
+                        </table>
+                        <div class="no-data" id="fbNoData" style="display:none;">No posts in selected range</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Engagement Mix</div>
+                            <div class="card-subtitle">Likes vs Comments vs Shares</div>
+                        </div>
+                        <div class="chart-wrap" style="height:240px;"><canvas id="fbEngMixChart"></canvas></div>
+                        <div class="info-box info-box-teal" style="margin-top:12px;">📊 Videos drive majority of media
+                            views. Photos dominate by count but videos show higher engagement per post.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- INSTAGRAM -->
+        <section class="tab-panel" id="tab-ig">
+            <div id="igEmpty" class="empty-state">
+                <div class="es-icon">📸</div>
+                <h3>No Instagram data loaded</h3>
+                <p>Click Refresh Live Data to pull Instagram posts and engagement.</p>
+                <button class="es-btn" onclick="document.getElementById('refreshBtn').click()">🔄 Refresh Live
+                    Data</button>
+            </div>
+            <div id="igContent" style="display:none;">
+                <div class="section-header">
+                    <div class="section-icon icon-ig">📸</div>
+                    <div class="section-title-block">
+                        <h2>Instagram — @intoaec</h2>
+                        <p id="igSubtitle">—</p>
+                    </div>
+                    <div class="section-line"></div>
+                    <span class="range-tag" id="igRangeTag">Last 31 Days</span>
+                </div>
+                <div class="metric-grid" style="grid-template-columns:repeat(5,1fr);">
+                    <div class="metric-card c-primary">
+                        <div class="metric-label">Followers</div>
+                        <div class="metric-value" id="ig-followers">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-neutral"
+                                id="ig-following">—</span><span class="metric-bench">ratio</span></div>
+                    </div>
+                    <div class="metric-card c-teal">
+                        <div class="metric-label">Posts (Filtered)</div>
+                        <div class="metric-value" id="ig-posts">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-up" id="ig-posts-d">in
+                                range</span><span class="metric-bench">published</span></div>
+                    </div>
+                    <div class="metric-card c-up">
+                        <div class="metric-label">Likes (Filtered)</div>
+                        <div class="metric-value" id="ig-likes">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-up" id="ig-likes-avg">—/post
+                                avg</span><span class="metric-bench">total likes</span></div>
+                    </div>
+                    <div class="metric-card c-warn">
+                        <div class="metric-label">Comments (Filtered)</div>
+                        <div class="metric-value" id="ig-comments">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-neutral"
+                                id="ig-comments-d">—</span><span class="metric-bench">total comments</span></div>
+                    </div>
+                    <div class="metric-card c-teal">
+                        <div class="metric-label">Engagement</div>
+                        <div class="metric-value" id="ig-eng">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-up" id="ig-eng-rate">—%</span><span
+                                class="metric-bench">est. eng. rate</span></div>
+                    </div>
+                </div>
+                <div class="chart-row two-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Likes per Post — Filtered</div>
+                                <div class="card-subtitle" id="igLikesSub">—</div>
+                            </div>
+                        </div>
+                        <div class="chart-wrap" style="height:240px;"><canvas id="igLikesTrendChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Post Type Distribution — Filtered</div>
+                                <div class="card-subtitle" id="igTypeSub">—</div>
+                            </div>
+                        </div>
+                        <div class="chart-wrap" style="height:240px;"><canvas id="igTypeChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="chart-row col-2-1">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Top Posts — Filtered Range</div>
+                                <div class="card-subtitle" id="igTopSub">—</div>
+                            </div>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Type</th>
+                                    <th>Date</th>
+                                    <th>Likes</th>
+                                    <th>Comments</th>
+                                    <th>Total</th>
+                                </tr>
+                            </thead>
+                            <tbody id="igTopPostsTable"></tbody>
+                        </table>
+                        <div class="no-data" id="igNoData" style="display:none;">No posts in selected range</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Avg Engagement by Type — Filtered</div>
+                            <div class="card-subtitle">Reels vs Feed comparison</div>
+                        </div>
+                        <div class="chart-wrap" style="height:240px;"><canvas id="igTypeEngChart"></canvas></div>
+                        <div class="info-box info-box-blue" style="margin-top:12px;">🎬 <strong>Reels</strong>
+                            consistently outperform Feed posts. Prioritising Reels for key announcements drives higher
+                            visibility.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- YOUTUBE -->
+        <section class="tab-panel" id="tab-yt">
+            <div id="ytEmpty" class="empty-state">
+                <div class="es-icon">▶️</div>
+                <h3>No YouTube data loaded</h3>
+                <p>Click Refresh Live Data to pull YouTube video metrics.</p>
+                <button class="es-btn" onclick="document.getElementById('refreshBtn').click()">🔄 Refresh Live
+                    Data</button>
+            </div>
+            <div id="ytContent" style="display:none;">
+                <div class="section-header">
+                    <div class="section-icon icon-yt">▶️</div>
+                    <div class="section-title-block">
+                        <h2>YouTube — IntoAEC Channel</h2>
+                        <p id="ytSubtitle">—</p>
+                    </div>
+                    <div class="section-line"></div>
+                    <span class="range-tag" id="ytRangeTag">Last 31 Days</span>
+                </div>
+                <div class="metric-grid" style="grid-template-columns:repeat(5,1fr);">
+                    <div class="metric-card c-primary">
+                        <div class="metric-label">Subscribers</div>
+                        <div class="metric-value" id="yt-subs">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-neutral">Growing</span><span
+                                class="metric-bench" id="yt-since">—</span></div>
+                    </div>
+                    <div class="metric-card c-teal">
+                        <div class="metric-label">Videos (Filtered)</div>
+                        <div class="metric-value" id="yt-videos">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-up" id="yt-videos-d">in
+                                range</span><span class="metric-bench">published</span></div>
+                    </div>
+                    <div class="metric-card c-up">
+                        <div class="metric-label">Views (Filtered)</div>
+                        <div class="metric-value" id="yt-views">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-up" id="yt-views-d">—/video
+                                avg</span><span class="metric-bench">total views</span></div>
+                    </div>
+                    <div class="metric-card c-warn">
+                        <div class="metric-label">Likes (Filtered)</div>
+                        <div class="metric-value" id="yt-likes">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-up" id="yt-likes-d">filtered
+                                range</span><span class="metric-bench">total likes</span></div>
+                    </div>
+                    <div class="metric-card c-teal">
+                        <div class="metric-label">Comments (Filtered)</div>
+                        <div class="metric-value" id="yt-comments">—</div>
+                        <div class="metric-footer"><span class="metric-delta delta-neutral" id="yt-comments-d">filtered
+                                range</span><span class="metric-bench">total comments</span></div>
+                    </div>
+                </div>
+                <div class="chart-row two-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Views per Video — Filtered</div>
+                                <div class="card-subtitle" id="ytViewsSub">—</div>
+                            </div>
+                        </div>
+                        <div class="chart-wrap" style="height:240px;"><canvas id="ytViewsTrendChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Video Type Distribution — Filtered</div>
+                                <div class="card-subtitle" id="ytTypeSub">—</div>
+                            </div>
+                        </div>
+                        <div class="chart-wrap" style="height:240px;"><canvas id="ytTypeChart"></canvas></div>
+                    </div>
+                </div>
+                <div class="chart-row col-2-1">
+                    <div class="card">
+                        <div class="card-header">
+                            <div>
+                                <div class="card-title">Videos Table — Filtered Range</div>
+                                <div class="card-subtitle" id="ytTableSub">—</div>
+                            </div>
+                        </div>
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>#</th>
+                                    <th>Date</th>
+                                    <th>Title</th>
+                                    <th>Type</th>
+                                    <th>Views</th>
+                                    <th>Likes</th>
+                                    <th>Comments</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ytVideosTable"></tbody>
+                        </table>
+                        <div class="no-data" id="ytNoData" style="display:none;">No videos in selected range</div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Channel Growth Signals</div>
+                            <div class="card-subtitle">All-time benchmarks</div>
+                        </div>
+                        <div class="bench-list" id="ytBenchList"></div>
+                        <div class="info-box info-box-warn" style="margin-top:12px;">⚠️ Subscriber count is
+                            channel-level (all-time). Video-level data above is filtered by date range.</div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- WEEKLY COMPARISON -->
+        <section class="tab-panel" id="tab-weekly">
+            <div id="weeklyEmpty" class="empty-state">
+                <div class="es-icon">📊</div>
+                <h3>No data for weekly comparison</h3>
+                <p>Click Refresh Live Data to load this week vs last week comparison.</p>
+                <button class="es-btn" onclick="document.getElementById('refreshBtn').click()">🔄 Refresh Live
+                    Data</button>
+            </div>
+            <div id="weeklyContent" style="display:none;">
+                <div class="section-header">
+                    <div class="section-icon icon-wk">📊</div>
+                    <div class="section-title-block">
+                        <h2>Weekly Comparison</h2>
+                        <p id="weeklyRangeLabel">This week vs previous week</p>
+                    </div>
+                    <div class="section-line"></div>
+                    <span class="range-tag" id="weeklyRangeTag">7d vs 7d</span>
+                </div>
+                <div class="notice-bar">📌 "This week" = the 7 days ending on the most recent date in the dataset. "Last
+                    week" = the 7 days before that.</div>
+                <div class="chart-row four-col" id="weeklyCards"></div>
+                <div class="chart-row two-col">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">Engagement — This Week vs Last Week</div>
+                            <div class="card-subtitle">Likes + comments across all platforms</div>
+                        </div>
+                        <div class="chart-wrap" style="height:260px;"><canvas id="weeklyEngagementChart"></canvas></div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">GA4 Traffic — This Week vs Last Week</div>
+                            <div class="card-subtitle">Active users, daily</div>
+                        </div>
+                        <div class="chart-wrap" style="height:260px;"><canvas id="weeklyGaChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <div class="dash-footer">
+            <span>IntoAEC Analytics Dashboard</span>
+            <span id="footerRange">No data loaded — click Refresh Live Data</span>
+        </div>
+    </div>
+
+    <script>
+        // ── Data state (all empty on load) ──────────────────────────────────────────
+        let GA4_DAILY = [];
+        let GA4_CHANNELS = [];
+        let GA4_PAGES = [];
+        let FB_POSTS = [];
+        let IG_POSTS = [];
+        let YT_VIDEOS = [];
+        let SUMMARY = {};
+        let dataLoaded = false;
+
+        function computeRefDate() {
+            const all = [...GA4_DAILY, ...FB_POSTS, ...IG_POSTS, ...YT_VIDEOS]
+                .map(d => d.date).filter(Boolean).sort();
+            return all.length ? new Date(all[all.length - 1]) : new Date();
+        }
+        let REF_DATE = new Date();
+        let activeFilter = { days: 31, start: null, end: null };
+
+        function getDateRange() {
+            if (activeFilter.days === 'all') return { start: '2000-01-01', end: REF_DATE.toISOString().slice(0, 10) };
+            if (activeFilter.days === 'custom') return { start: activeFilter.start, end: activeFilter.end };
+            const end = new Date(REF_DATE), start = new Date(REF_DATE);
+            start.setDate(start.getDate() - (activeFilter.days - 1));
+            return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) };
+        }
+        function inRange(d) { const { start, end } = getDateRange(); return d >= start && d <= end; }
+        function rangeLabel() {
+            if (activeFilter.days === 'all') return 'All Time';
+            if (activeFilter.days === 'custom') return `${activeFilter.start} → ${activeFilter.end}`;
+            return `Last ${activeFilter.days} Days`;
+        }
+
+        // ── Charts ────────────────────────────────────────────────────────────────────
+        const charts = {};
+        const C = {
+            blue: '#0066cc', teal: '#00cccc', up: '#12b47a', warn: '#f59e0b',
+            down: '#e5403c', purple: '#7c3aed', muted: '#7080a0',
+            mixed: ['#0066cc', '#00cccc', '#12b47a', '#f59e0b', '#e5403c', '#7c3aed', '#0088ee', '#ff6b35']
+        };
+        function makeChart(id, type, data, options) {
+            if (charts[id]) charts[id].destroy();
+            const ctx = document.getElementById(id);
+            if (!ctx) return;
+            charts[id] = new Chart(ctx, { type, data, options });
+        }
+        const baseOpts = (showLegend = false) => ({
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: showLegend, position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } }, tooltip: { mode: 'index', intersect: false } },
+            scales: { x: { grid: { display: false }, ticks: { font: { size: 10 }, color: '#7080a0', maxRotation: 45 } }, y: { grid: { color: '#eef1f7' }, ticks: { font: { size: 10 }, color: '#7080a0' } } }
+        });
+        function fmt(n) { return (n || 0).toLocaleString(); }
+
+        // ── Show/hide empty states ────────────────────────────────────────────────────
+        function toggleSection(prefix, hasData) {
+            const empty = document.getElementById(prefix + 'Empty');
+            const content = document.getElementById(prefix + 'Content');
+            if (empty) empty.style.display = hasData ? 'none' : '';
+            if (content) content.style.display = hasData ? '' : 'none';
+        }
+
+        // ── Render ────────────────────────────────────────────────────────────────────
+        function renderAll() {
+            const label = rangeLabel();
+            const { start, end } = getDateRange();
+
+            ['ovRangeTag', 'gaRangeTag', 'fbRangeTag', 'igRangeTag', 'ytRangeTag'].forEach(id => {
+                const el = document.getElementById(id); if (el) el.textContent = label;
+            });
+            document.getElementById('headerRangeLabel').textContent = `📅 ${label}`;
+            document.getElementById('filterInfo').textContent = `Showing: ${label}`;
+            document.getElementById('footerRange').textContent = `${label} · ${REF_DATE.toISOString().slice(0, 10)}`;
+
+            const hasGA = GA4_DAILY.length > 0;
+            const hasFB = FB_POSTS.length > 0;
+            const hasIG = IG_POSTS.length > 0;
+            const hasYT = YT_VIDEOS.length > 0;
+            const hasAny = hasGA || hasFB || hasIG || hasYT;
+
+            toggleSection('overview', hasAny);
+            toggleSection('ga', hasGA);
+            toggleSection('fb', hasFB);
+            toggleSection('ig', hasIG);
+            toggleSection('yt', hasYT);
+            toggleSection('weekly', hasAny);
+
+            if (!hasAny) return;
+
+            // Summary numbers
+            document.getElementById('kpi-ig-followers').textContent = fmt(SUMMARY.igFollowers);
+            document.getElementById('kpi-ig-sub').textContent = `${fmt(SUMMARY.igMediaCount)} total posts`;
+            document.getElementById('kpi-fb-fans').textContent = fmt(SUMMARY.fbFans);
+            document.getElementById('kpi-fb-sub').textContent = `${FB_POSTS.length} posts tracked`;
+            if (document.getElementById('fb-fans')) document.getElementById('fb-fans').textContent = fmt(SUMMARY.fbFans);
+            if (document.getElementById('fb-followers')) document.getElementById('fb-followers').textContent = `${fmt(SUMMARY.fbFollowers)} followers`;
+            if (document.getElementById('ig-followers')) document.getElementById('ig-followers').textContent = fmt(SUMMARY.igFollowers);
+            if (document.getElementById('ig-following')) document.getElementById('ig-following').textContent = `${fmt(SUMMARY.igFollowing)} following`;
+            if (document.getElementById('igSubtitle')) document.getElementById('igSubtitle').textContent = `${fmt(SUMMARY.igFollowers)} followers · ${fmt(SUMMARY.igMediaCount)} total posts`;
+            if (document.getElementById('fbSubtitle')) document.getElementById('fbSubtitle').textContent = `${FB_POSTS.length} posts tracked`;
+            if (document.getElementById('yt-subs')) document.getElementById('yt-subs').textContent = fmt(SUMMARY.ytSubscribers);
+            if (document.getElementById('yt-since')) document.getElementById('yt-since').textContent = SUMMARY.ytPublishedAt ? `Since ${SUMMARY.ytPublishedAt.slice(0, 7)}` : '—';
+            if (document.getElementById('ytSubtitle')) document.getElementById('ytSubtitle').textContent = `Published ${SUMMARY.ytPublishedAt || '—'} · ${fmt(SUMMARY.ytTotalVideos)} videos total`;
+            // ── GA4 ──
+            if (hasGA) {
+                const gaF = GA4_DAILY.filter(d => inRange(d.date));
+                const gaUsers = gaF.reduce((s, d) => s + d.users, 0);
+                const gaNewUsers = gaF.reduce((s, d) => s + d.newUsers, 0);
+                const gaViews = gaF.reduce((s, d) => s + d.views, 0);
+                const gaSess = gaF.reduce((s, d) => s + d.sessions, 0);
+                const gaConv = gaF.reduce((s, d) => s + d.conversions, 0);
+                const gaDays = gaF.length;
+
+                document.getElementById('kpi-users').textContent = fmt(gaUsers);
+                document.getElementById('kpi-users-sub').textContent = `${gaDays} days`;
+                document.getElementById('kpi-views').textContent = fmt(gaViews);
+                document.getElementById('kpi-views-sub').textContent = `${gaDays} days`;
+                document.getElementById('ga-users').textContent = fmt(gaUsers);
+                document.getElementById('ga-users-d').textContent = `${gaDays} days`;
+                document.getElementById('ga-new').textContent = fmt(gaNewUsers);
+                document.getElementById('ga-new-pct').textContent = gaUsers > 0 ? `${((gaNewUsers / gaUsers) * 100).toFixed(1)}% new` : '—';
+                document.getElementById('ga-pv').textContent = fmt(gaViews);
+                document.getElementById('ga-pv-d').textContent = `${gaDays} days`;
+                document.getElementById('ga-sess').textContent = fmt(gaSess);
+                document.getElementById('ga-sess-d').textContent = gaUsers > 0 ? `${(gaSess / gaUsers).toFixed(2)}/user` : '—';
+                document.getElementById('ga-conv').textContent = fmt(gaConv);
+                document.getElementById('ga-conv-d').textContent = gaUsers > 0 ? `${((gaConv / gaUsers) * 100).toFixed(1)}% rate` : '—';
+
+                const gaSubText = `${start} → ${end} · ${gaDays} days`;
+                document.getElementById('ovChartSub').textContent = gaSubText;
+                document.getElementById('gaDailySub').textContent = gaSubText;
+
+                const gaDS = {
+                    labels: gaF.map(d => d.date.slice(5)),
+                    datasets: [
+                        { label: 'Active Users', data: gaF.map(d => d.users), borderColor: C.blue, backgroundColor: 'rgba(0,102,204,.08)', fill: true, tension: .4, pointRadius: 2, borderWidth: 2 },
+                        { label: 'Page Views', data: gaF.map(d => d.views), borderColor: C.teal, backgroundColor: 'rgba(0,204,204,.04)', fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }
+                    ]
+                };
+                makeChart('overviewUsersChart', 'line', gaDS, baseOpts(true));
+                makeChart('gaDailyChart', 'line', gaDS, baseOpts(true));
+
+                const durF = gaF.filter(d => d.dur > 0).sort((a, b) => b.dur - a.dur).slice(0, 10);
+                makeChart('gaSessionDurChart', 'bar', {
+                    labels: durF.map(d => d.date.slice(5)),
+                    datasets: [{ label: 'Avg Duration (s)', data: durF.map(d => Math.round(d.dur)), backgroundColor: `${C.up}bb`, borderRadius: 4 }]
+                }, {
+                    ...baseOpts(), indexAxis: 'y', plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } },
+                    scales: { x: { grid: { color: '#eef1f7' }, ticks: { font: { size: 10 } } }, y: { grid: { display: false }, ticks: { font: { size: 10 } } } }
+                });
+
+                if (GA4_CHANNELS.length) {
+                    const chOpts = { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 10 }, boxWidth: 10 } }, tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toLocaleString()}` } } } };
+                    const chDS = { labels: GA4_CHANNELS.map(c => c.channel), datasets: [{ data: GA4_CHANNELS.map(c => c.sessions), backgroundColor: C.mixed, borderWidth: 2, borderColor: '#fff' }] };
+                    makeChart('overviewChannelChart', 'doughnut', chDS, chOpts);
+                    makeChart('gaChannelDoughnut', 'doughnut', chDS, { ...chOpts, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 10 } }, tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toLocaleString()}` } } } });
+                    makeChart('gaChannelBar', 'bar', {
+                        labels: GA4_CHANNELS.map(c => c.channel),
+                        datasets: [{ label: 'Sessions', data: GA4_CHANNELS.map(c => c.sessions), backgroundColor: C.mixed, borderRadius: 4 }]
+                    }, { ...baseOpts(), plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } } });
+                }
+
+                // Top pages tables (GA4 tab + Overview tab)
+                // FIX: previously read from window._GA4_PAGES, which was only ever set if
+                // payload.GA4_PAGES existed — but the backend never sent that key, so
+                // these tables always rendered empty regardless of date filter.
+                // Now reads from the GA4_PAGES state populated directly by applyDataset().
+                const gaTP = document.getElementById('gaTopPagesTable');
+                const gaPagesND = document.getElementById('gaPagesNoData');
+                if (gaTP) {
+                    gaTP.innerHTML = '';
+                    if (!GA4_PAGES.length) {
+                        if (gaPagesND) gaPagesND.style.display = 'block';
+                    } else {
+                        if (gaPagesND) gaPagesND.style.display = 'none';
+                        GA4_PAGES.forEach((p, i) => {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `<td><span class="rank-badge">${i + 1}</span></td><td><span class="page-name">${p.path}</span></td><td style="font-size:11px;color:var(--text2);">${p.title}</td><td>${fmt(p.views)}</td><td>${p.duration}s</td>`;
+                            gaTP.appendChild(tr);
+                        });
+                    }
+                }
+                const ovTP = document.getElementById('ovTopPagesTable');
+                if (ovTP) {
+                    ovTP.innerHTML = '';
+                    if (!GA4_PAGES.length) {
+                        ovTP.innerHTML = '<tr><td colspan="4" class="no-data">No page-view data available</td></tr>';
+                    } else {
+                        GA4_PAGES.slice(0, 5).forEach((p, i) => {
+                            const tr = document.createElement('tr');
+                            tr.innerHTML = `<td><span class="rank-badge">${i + 1}</span></td><td><span class="page-name">${p.path}</span></td><td>${fmt(p.views)}</td><td>${p.duration}s</td>`;
+                            ovTP.appendChild(tr);
+                        });
+                    }
+                }
+
+                // Dynamic observations
+                const obsEl = document.getElementById('observationsContent');
+                if (obsEl && gaF.length) {
+                    const peakDay = gaF.reduce((a, b) => b.users > a.users ? b : a);
+                    obsEl.innerHTML = `
+        <div class="obs-card obs-up" style="margin-top:0;">
+          <div class="obs-icon">🌐</div>
+          <div class="obs-text"><h4>GA4 peaked ${peakDay.date} with ${fmt(peakDay.users)} users</h4><p>Highest single-day traffic: ${fmt(peakDay.users)} active users, ${fmt(peakDay.views)} page views.</p></div>
+        </div>
+        <div class="obs-card obs-neutral">
+          <div class="obs-icon">📸</div>
+          <div class="obs-text"><h4>Instagram driving highest engagement</h4><p>${fmt(SUMMARY.igFollowers)} followers. Reels consistently outperform Feed posts.</p></div>
+        </div>
+        <div class="obs-card obs-warn">
+          <div class="obs-icon">📘</div>
+          <div class="obs-text"><h4>Facebook reach data unavailable</h4><p>Reach is reported as 0 for the 28-day window — API limitation. Media views confirm content is being served.</p></div>
+        </div>`;
+                }
+            }
+
+            // ── Facebook ──
+            if (hasFB) {
+                const fbF = FB_POSTS.filter(d => inRange(d.date)).sort((a, b) => b.date.localeCompare(a.date));
+                const fbLikes = fbF.reduce((s, p) => s + p.likes, 0);
+                const fbComments = fbF.reduce((s, p) => s + p.comments, 0);
+                const fbShares = fbF.reduce((s, p) => s + p.shares, 0);
+                const fbMV = fbF.reduce((s, p) => s + (p.mediaViews || 0), 0);
+                const fbCount = fbF.length;
+
+                document.getElementById('fb-likes').textContent = fmt(fbLikes);
+                document.getElementById('fb-likes-d').textContent = `${fbCount} posts`;
+                document.getElementById('fb-comments').textContent = fmt(fbComments);
+                document.getElementById('fb-comments-d').textContent = `${fbCount} posts`;
+                document.getElementById('fb-posts-count').textContent = fmt(fbCount);
+                document.getElementById('fb-posts-d').textContent = `in ${label}`;
+                document.getElementById('fb-mediaviews').textContent = fmt(fbMV);
+                const fbSub = `${label} · ${fbCount} posts`;
+                document.getElementById('fbTypeChartSub').textContent = fbSub;
+                document.getElementById('fbTopChartSub').textContent = fbSub;
+                document.getElementById('fbTableSub').textContent = fbSub;
+                document.getElementById('fbSubOv').textContent = fbSub;
+
+                const fbTC = {};
+                fbF.forEach(p => { fbTC[p.type] = (fbTC[p.type] || 0) + 1; });
+                const doughOpts = (pos = 'right') => ({ responsive: true, maintainAspectRatio: false, plugins: { legend: { position: pos, labels: { font: { size: 10 }, boxWidth: 10 } } } });
+                makeChart('fbTypeChart', 'doughnut', { labels: Object.keys(fbTC), datasets: [{ data: Object.values(fbTC), backgroundColor: C.mixed.slice(0, Object.keys(fbTC).length), borderWidth: 2, borderColor: '#fff' }] }, doughOpts());
+                makeChart('fbPostTypeChart', 'doughnut', { labels: Object.keys(fbTC), datasets: [{ data: Object.values(fbTC), backgroundColor: C.mixed.slice(0, Object.keys(fbTC).length), borderWidth: 2, borderColor: '#fff' }] }, doughOpts('right'));
+
+                const fbTop = [...fbF].sort((a, b) => b.likes - a.likes).slice(0, 10);
+                makeChart('fbTopPostsChart', 'bar', {
+                    labels: fbTop.map(p => p.date.slice(5)),
+                    datasets: [
+                        { label: 'Likes', data: fbTop.map(p => p.likes), backgroundColor: `${C.blue}bb`, borderRadius: 4 },
+                        { label: 'Comments', data: fbTop.map(p => p.comments), backgroundColor: `${C.teal}bb`, borderRadius: 4 }
+                    ]
+                }, { ...baseOpts(true), plugins: { legend: { display: true, position: 'top', labels: { font: { size: 10 }, boxWidth: 10 } }, tooltip: { mode: 'index', intersect: false } } });
+
+                makeChart('fbEngMixChart', 'bar', {
+                    labels: ['Likes', 'Comments', 'Shares'],
+                    datasets: [{ data: [fbLikes, fbComments, fbShares], backgroundColor: [C.blue, C.teal, C.up], borderRadius: 6 }]
+                }, { ...baseOpts(), plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } } });
+
+                const fbTbl = document.getElementById('fbPostsTable');
+                const fbND = document.getElementById('fbNoData');
+                fbTbl.innerHTML = '';
+                if (!fbF.length) { fbND.style.display = 'block'; }
+                else {
+                    fbND.style.display = 'none';
+                    fbF.forEach(p => {
+                        const tc = { photo: 'type-photo', video: 'type-video', album: 'type-photo', share: 'type-share', event: 'type-feed' }[p.type] || 'type-feed';
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td>${p.date.slice(5)}</td><td><span class="type-badge ${tc}">${p.type}</span></td><td>${p.likes}</td><td>${p.comments}</td><td>${p.shares}</td><td>${p.mediaViews || '—'}</td>`;
+                        fbTbl.appendChild(tr);
+                    });
+                }
+            }
+
+            // ── Instagram ──
+            if (hasIG) {
+                const igF = IG_POSTS.filter(d => inRange(d.date)).sort((a, b) => b.date.localeCompare(a.date));
+                const igLikes = igF.reduce((s, p) => s + p.likes, 0);
+                const igComments = igF.reduce((s, p) => s + p.comments, 0);
+                const igCount = igF.length;
+                const igAvg = igCount > 0 ? (igLikes / igCount).toFixed(1) : 0;
+                const igEngRate = ((igLikes + igComments) / (SUMMARY.igFollowers || 1) * 100).toFixed(2);
+
+                document.getElementById('ig-posts').textContent = fmt(igCount);
+                document.getElementById('ig-posts-d').textContent = `in ${label}`;
+                document.getElementById('ig-likes').textContent = fmt(igLikes);
+                document.getElementById('ig-likes-avg').textContent = `${igAvg}/post avg`;
+                document.getElementById('ig-comments').textContent = fmt(igComments);
+                document.getElementById('ig-comments-d').textContent = `${igCount} posts`;
+                document.getElementById('ig-eng').textContent = fmt(igLikes + igComments);
+                document.getElementById('ig-eng-rate').textContent = `${igEngRate}%`;
+                const igSub = `${label} · ${igCount} posts`;
+                ['igLikesSub', 'igTypeSub', 'igTopSub', 'igSubOv'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = igSub; });
+
+                const igTopOv = [...igF].sort((a, b) => (b.likes + b.comments) - (a.likes + a.comments)).slice(0, 10);
+                makeChart('igEngChart', 'bar', {
+                    labels: igTopOv.map((_, i) => `#${i + 1}`),
+                    datasets: [{ label: 'Likes', data: igTopOv.map(p => p.likes), backgroundColor: C.mixed.map(c => c + 'bb'), borderRadius: 4 }]
+                }, { ...baseOpts(), plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 9 } } }, y: { grid: { color: '#eef1f7' }, ticks: { font: { size: 9 } } } } });
+
+                makeChart('igLikesTrendChart', 'line', {
+                    labels: igF.map(p => p.date.slice(5)),
+                    datasets: [{ label: 'Likes', data: igF.map(p => p.likes), borderColor: C.purple, backgroundColor: 'rgba(124,58,237,.08)', fill: true, tension: .4, pointRadius: 3, borderWidth: 2 }]
+                }, { ...baseOpts(), plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } } });
+
+                const igTC = { REELS: 0, FEED: 0 };
+                igF.forEach(p => { igTC[p.type] = (igTC[p.type] || 0) + 1; });
+                makeChart('igTypeChart', 'doughnut', { labels: ['Reels', 'Feed Posts'], datasets: [{ data: [igTC.REELS, igTC.FEED], backgroundColor: [C.purple, C.teal], borderWidth: 2, borderColor: '#fff' }] },
+                    { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 12 }, boxWidth: 12 } } } });
+
+                const reels = igF.filter(p => p.type === 'REELS'), feed = igF.filter(p => p.type === 'FEED');
+                const rAvg = reels.length ? +(reels.reduce((s, p) => s + p.likes, 0) / reels.length).toFixed(1) : 0;
+                const fAvg = feed.length ? +(feed.reduce((s, p) => s + p.likes, 0) / feed.length).toFixed(1) : 0;
+                makeChart('igTypeEngChart', 'bar', { labels: ['Avg Likes — Reels', 'Avg Likes — Feed'], datasets: [{ data: [rAvg, fAvg], backgroundColor: [`${C.purple}bb`, `${C.teal}bb`], borderRadius: 6 }] },
+                    { ...baseOpts(), plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false } }, y: { grid: { color: '#eef1f7' }, ticks: { font: { size: 10 } } } } });
+
+                const igTbl = document.getElementById('igTopPostsTable');
+                const igND = document.getElementById('igNoData');
+                igTbl.innerHTML = '';
+                if (!igF.length) { igND.style.display = 'block'; }
+                else {
+                    igND.style.display = 'none';
+                    [...igF].sort((a, b) => (b.likes + b.comments) - (a.likes + a.comments)).slice(0, 12).forEach((p, i) => {
+                        const tc = p.type === 'REELS' ? 'type-reel' : 'type-feed';
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td><span class="rank-badge">${i + 1}</span></td><td><span class="type-badge ${tc}">${p.type}</span></td><td>${p.date.slice(5)}</td><td>${p.likes}</td><td>${p.comments}</td><td><strong>${p.likes + p.comments}</strong></td>`;
+                        igTbl.appendChild(tr);
+                    });
+                }
+            }
+
+            // ── YouTube ──
+            if (hasYT) {
+                const ytF = YT_VIDEOS.filter(d => inRange(d.date)).sort((a, b) => b.date.localeCompare(a.date));
+                const ytViews = ytF.reduce((s, v) => s + v.views, 0);
+                const ytLikes = ytF.reduce((s, v) => s + v.likes, 0);
+                const ytComments = ytF.reduce((s, v) => s + v.comments, 0);
+                const ytCount = ytF.length;
+
+                document.getElementById('kpi-yt-videos').textContent = fmt(ytCount);
+                document.getElementById('kpi-yt-sub').textContent = `${ytCount} videos · ${fmt(ytViews)} views`;
+                document.getElementById('yt-videos').textContent = fmt(ytCount);
+                document.getElementById('yt-videos-d').textContent = `in ${label}`;
+                document.getElementById('yt-views').textContent = fmt(ytViews);
+                document.getElementById('yt-views-d').textContent = ytCount ? `${(ytViews / ytCount).toFixed(1)}/video avg` : '—';
+                document.getElementById('yt-likes').textContent = fmt(ytLikes);
+                document.getElementById('yt-comments').textContent = fmt(ytComments);
+
+                const ytSub = `${label} · ${ytCount} videos`;
+                ['ytViewsSub', 'ytTypeSub', 'ytTableSub'].forEach(id => { const el = document.getElementById(id); if (el) el.textContent = ytSub; });
+
+                const ytChron = [...ytF].sort((a, b) => a.date.localeCompare(b.date));
+                makeChart('ytViewsTrendChart', 'bar', {
+                    labels: ytChron.map(v => v.date.slice(5)),
+                    datasets: [{ label: 'Views', data: ytChron.map(v => v.views), backgroundColor: ytChron.map(v => v.type === 'SHORT' ? `${C.warn}cc` : `${C.down}cc`), borderRadius: 4 }]
+                }, {
+                    ...baseOpts(), plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { title: items => { const v = ytChron[items[0].dataIndex]; return (v.title || '').length > 30 ? v.title.slice(0, 30) + '…' : v.title; }, label: ctx => `Views: ${ctx.parsed.y}` } } },
+                    scales: { x: { grid: { display: false }, ticks: { font: { size: 9 }, maxRotation: 60 } }, y: { grid: { color: '#eef1f7' }, ticks: { font: { size: 10 } } } }
+                });
+
+                const ytTC = { SHORT: 0, LONG: 0 };
+                ytF.forEach(v => { ytTC[v.type] = (ytTC[v.type] || 0) + 1; });
+                makeChart('ytTypeChart', 'doughnut', { labels: ['Shorts', 'Long-form'], datasets: [{ data: [ytTC.SHORT, ytTC.LONG], backgroundColor: [C.warn, C.down], borderWidth: 2, borderColor: '#fff' }] },
+                    { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 12 }, boxWidth: 12 } } } });
+
+                const ytTbl = document.getElementById('ytVideosTable');
+                const ytND = document.getElementById('ytNoData');
+                ytTbl.innerHTML = '';
+                if (!ytF.length) { ytND.style.display = 'block'; }
+                else {
+                    ytND.style.display = 'none';
+                    ytF.slice(0, 20).forEach((v, i) => {
+                        const tc = v.type === 'SHORT' ? 'type-short' : 'type-long';
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td><span class="rank-badge">${i + 1}</span></td><td>${v.date.slice(5)}</td><td style="font-size:11px;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${v.title}">${v.title}</td><td><span class="type-badge ${tc}">${v.type}</span></td><td>${v.views}</td><td>${v.likes}</td><td>${v.comments}</td>`;
+                        ytTbl.appendChild(tr);
+                    });
+                }
+
+                const ytBench = document.getElementById('ytBenchList');
+                if (ytBench) {
+                    const allViews = YT_VIDEOS.reduce((s, v) => s + v.views, 0);
+                    const allCount = YT_VIDEOS.length;
+                    const avgV = allCount ? (allViews / allCount).toFixed(1) : 0;
+                    const maxSubs = 500, maxViews = 10000, maxVids = 200;
+                    ytBench.innerHTML = `
+        <div class="bench-row"><div class="bench-label">Total Subscribers (${fmt(SUMMARY.ytSubscribers || 0)})</div><div class="bench-track"><div class="bench-fill fill-warn" style="width:${Math.min(100, (SUMMARY.ytSubscribers || 0) / maxSubs * 100).toFixed(0)}%;"></div></div><div class="bench-val">${fmt(SUMMARY.ytSubscribers || 0)}</div></div>
+        <div class="bench-row"><div class="bench-label">Total Views (${fmt(SUMMARY.ytTotalViews || allViews)})</div><div class="bench-track"><div class="bench-fill fill-primary" style="width:${Math.min(100, (SUMMARY.ytTotalViews || allViews) / maxViews * 100).toFixed(0)}%;"></div></div><div class="bench-val">${fmt(SUMMARY.ytTotalViews || allViews)}</div></div>
+        <div class="bench-row"><div class="bench-label">Videos Published (${allCount})</div><div class="bench-track"><div class="bench-fill fill-up" style="width:${Math.min(100, allCount / maxVids * 100).toFixed(0)}%;"></div></div><div class="bench-val">${allCount}</div></div>
+        <div class="bench-row"><div class="bench-label">Avg Views / Video</div><div class="bench-track"><div class="bench-fill fill-warn" style="width:${Math.min(100, +avgV / 200 * 100).toFixed(0)}%;"></div></div><div class="bench-val">${avgV}</div></div>`;
+                }
+            }
+
+            // ── Audience chart ──
+            if (hasAny) {
+                makeChart('audienceChart', 'bar', {
+                    labels: ['IG Followers', 'FB Fans', 'YT Subs'],
+                    datasets: [{ data: [SUMMARY.igFollowers || 0, SUMMARY.fbFans || 0, SUMMARY.ytSubscribers || 0], backgroundColor: [C.blue, C.teal, C.down], borderRadius: 6 }]
+                }, { ...baseOpts(), plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false } }, scales: { x: { grid: { display: false }, ticks: { font: { size: 11 } } }, y: { grid: { color: '#eef1f7' }, ticks: { font: { size: 10 } } } } });
+            }
+
+            renderWeeklyComparison();
+        }
+
+        // ── Weekly comparison ─────────────────────────────────────────────────────────
+        function weekBuckets() {
+            const end = new Date(REF_DATE);
+            const tws = new Date(end); tws.setDate(end.getDate() - 6);
+            const lwe = new Date(tws); lwe.setDate(tws.getDate() - 1);
+            const lws = new Date(lwe); lws.setDate(lwe.getDate() - 6);
+            const iso = d => d.toISOString().slice(0, 10);
+            return { thisStart: iso(tws), thisEnd: iso(end), lastStart: iso(lws), lastEnd: iso(lwe) };
+        }
+        function sumW(dataset, dateKey, keys, s, e) {
+            const rows = dataset.filter(d => d[dateKey] >= s && d[dateKey] <= e);
+            const out = { count: rows.length };
+            keys.forEach(k => { out[k] = rows.reduce((a, r) => a + (r[k] || 0), 0); });
+            return out;
+        }
+        function pctD(curr, prev) { if (prev === 0) return curr === 0 ? 0 : 100; return ((curr - prev) / prev) * 100; }
+        function deltaBadge(pct) {
+            const cls = pct > 0.5 ? 'delta-up' : pct < -0.5 ? 'delta-down' : 'delta-neutral';
+            const arrow = pct > 0.5 ? '▲' : pct < -0.5 ? '▼' : '–';
+            const bg = pct > 0.5 ? 'var(--up-bg)' : pct < -0.5 ? 'var(--down-bg)' : 'var(--neutral-bg)';
+            const col = pct > 0.5 ? 'var(--up)' : pct < -0.5 ? 'var(--down)' : 'var(--neutral)';
+            return `<span class="wk-delta" style="background:${bg};color:${col};">${arrow} ${Math.abs(pct).toFixed(0)}%</span>`;
+        }
+        function wkRow(name, curr, prev) { return `<div class="wk-row"><div class="wk-metric-name">${name}</div><div class="wk-values"><span class="wk-val-this">${fmt(curr)}</span><span class="wk-val-prev">vs ${fmt(prev)}</span>${deltaBadge(pctD(curr, prev))}</div></div>`; }
+
+        function renderWeeklyComparison() {
+            const { thisStart, thisEnd, lastStart, lastEnd } = weekBuckets();
+            document.getElementById('weeklyRangeTag').textContent = `${thisStart} → ${thisEnd}`;
+            document.getElementById('weeklyRangeLabel').textContent = `This week (${thisStart}→${thisEnd}) vs last week (${lastStart}→${lastEnd})`;
+
+            const fbThis = sumW(FB_POSTS, 'date', ['likes', 'comments', 'shares', 'mediaViews'], thisStart, thisEnd);
+            const fbLast = sumW(FB_POSTS, 'date', ['likes', 'comments', 'shares', 'mediaViews'], lastStart, lastEnd);
+            const igThis = sumW(IG_POSTS, 'date', ['likes', 'comments'], thisStart, thisEnd);
+            const igLast = sumW(IG_POSTS, 'date', ['likes', 'comments'], lastStart, lastEnd);
+            const ytThis = sumW(YT_VIDEOS, 'date', ['views', 'likes', 'comments'], thisStart, thisEnd);
+            const ytLast = sumW(YT_VIDEOS, 'date', ['views', 'likes', 'comments'], lastStart, lastEnd);
+            const gaThis = sumW(GA4_DAILY, 'date', ['users', 'views', 'sessions', 'conversions'], thisStart, thisEnd);
+            const gaLast = sumW(GA4_DAILY, 'date', ['users', 'views', 'sessions', 'conversions'], lastStart, lastEnd);
+
+            document.getElementById('weeklyCards').innerHTML = `
+    <div class="wk-card"><div class="wk-card-head"><span class="wk-icon">📘</span><h3>Facebook</h3></div>
+      ${wkRow('Posts', fbThis.count, fbLast.count)}${wkRow('Likes', fbThis.likes, fbLast.likes)}${wkRow('Comments', fbThis.comments, fbLast.comments)}${wkRow('Media Views', fbThis.mediaViews, fbLast.mediaViews)}</div>
+    <div class="wk-card"><div class="wk-card-head"><span class="wk-icon">📸</span><h3>Instagram</h3></div>
+      ${wkRow('Posts', igThis.count, igLast.count)}${wkRow('Likes', igThis.likes, igLast.likes)}${wkRow('Comments', igThis.comments, igLast.comments)}${wkRow('Engagement', igThis.likes + igThis.comments, igLast.likes + igLast.comments)}</div>
+    <div class="wk-card"><div class="wk-card-head"><span class="wk-icon">▶️</span><h3>YouTube</h3></div>
+      ${wkRow('Videos', ytThis.count, ytLast.count)}${wkRow('Views', ytThis.views, ytLast.views)}${wkRow('Likes', ytThis.likes, ytLast.likes)}${wkRow('Comments', ytThis.comments, ytLast.comments)}</div>
+    <div class="wk-card"><div class="wk-card-head"><span class="wk-icon">🌐</span><h3>Google Analytics</h3></div>
+      ${wkRow('Active Users', gaThis.users, gaLast.users)}${wkRow('Page Views', gaThis.views, gaLast.views)}${wkRow('Sessions', gaThis.sessions, gaLast.sessions)}${wkRow('Conversions', gaThis.conversions, gaLast.conversions)}</div>`;
+
+            makeChart('weeklyEngagementChart', 'bar', {
+                labels: ['Facebook', 'Instagram', 'YouTube'],
+                datasets: [
+                    { label: 'Last Week', data: [fbLast.likes + fbLast.comments, igLast.likes + igLast.comments, ytLast.likes + ytLast.comments], backgroundColor: `${C.muted}99`, borderRadius: 4 },
+                    { label: 'This Week', data: [fbThis.likes + fbThis.comments, igThis.likes + igThis.comments, ytThis.likes + ytThis.comments], backgroundColor: `${C.blue}cc`, borderRadius: 4 }
+                ]
+            }, { ...baseOpts(true), plugins: { legend: { display: true, position: 'top', labels: { font: { size: 11 }, boxWidth: 12 } }, tooltip: { mode: 'index', intersect: false } } });
+
+            const dayLabels = [...Array(7)].map((_, i) => `Day ${i + 1}`);
+            const buildSeries = startStr => dayLabels.map((_, i) => { const d = new Date(startStr); d.setDate(d.getDate() + i); const iso = d.toISOString().slice(0, 10); const row = GA4_DAILY.find(r => r.date === iso); return row ? row.users : 0; });
+            makeChart('weeklyGaChart', 'line', {
+                labels: dayLabels,
+                datasets: [
+                    { label: 'Last Week', data: buildSeries(lastStart), borderColor: C.muted, backgroundColor: 'rgba(112,128,160,.06)', fill: true, tension: .4, pointRadius: 2, borderWidth: 2, borderDash: [5, 4] },
+                    { label: 'This Week', data: buildSeries(thisStart), borderColor: C.blue, backgroundColor: 'rgba(0,102,204,.08)', fill: true, tension: .4, pointRadius: 2, borderWidth: 2 }
+                ]
+            }, baseOpts(true));
+        }
+
+        // ── LinkedIn rendering ─────────────────────────────────────────────────────────────────
+        function renderLinkedIn() {
+            return;
+            if (!LI_DAILY.length) return;
+            const { start, end } = getDateRange();
+            const label = rangeLabel();
+
+            // Filter daily data by date range for KPI metrics
+            const liF = LI_DAILY.filter(d => inRange(d.date));
+            const liSessions = liF.reduce((s, d) => s + d.sessions, 0);
+            const liUsers = liF.reduce((s, d) => s + d.users, 0);
+            const liViews = liF.reduce((s, d) => s + d.views, 0);
+            const liConv = liF.reduce((s, d) => s + d.conversions, 0);
+            const liAvgDur = liF.length ? (liF.reduce((s, d) => s + d.dur, 0) / liF.length).toFixed(1) : 0;
+            const liDays = liF.length;
+
+            // Update KPI cards
+            const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+            setEl('li-sessions', fmt(liSessions));
+            setEl('li-sessions-d', `${liDays} days`);
+            setEl('li-users', fmt(liUsers));
+            setEl('li-users-d', liSessions > 0 ? `${((liUsers / liSessions) * 100).toFixed(1)}% return` : '—');
+            setEl('li-views', fmt(liViews));
+            setEl('li-views-d', liUsers > 0 ? `${(liViews / liUsers).toFixed(2)}/user` : '—');
+            setEl('li-dur', `${liAvgDur}s`);
+            setEl('li-conv', fmt(liConv));
+            setEl('li-conv-d', liSessions > 0 ? `${((liConv / liSessions) * 100).toFixed(2)}% rate` : '—');
+            setEl('liDailySub', `${start} → ${end} · ${liDays} days`);
+
+            // Daily sessions chart
+            makeChart('liDailyChart', 'line', {
+                labels: liF.map(d => d.date.slice(5)),
+                datasets: [
+                    { label: 'Sessions', data: liF.map(d => d.sessions), borderColor: '#0a66c2', backgroundColor: 'rgba(10,102,194,.1)', fill: true, tension: .4, pointRadius: 2, borderWidth: 2 },
+                    { label: 'Users', data: liF.map(d => d.users), borderColor: '#1b8fe0', backgroundColor: 'rgba(27,143,224,.05)', fill: false, tension: .4, pointRadius: 2, borderWidth: 2, borderDash: [4, 3] }
+                ]
+            }, baseOpts(true));
+
+            // LinkedIn vs other social channels (bar chart)
+            if (LI_SOCIAL_CHANNELS.length) {
+                const topChannels = LI_SOCIAL_CHANNELS.slice(0, 8);
+                const bgColors = topChannels.map(c => {
+                    const src = (c.source || '').toLowerCase();
+                    if (src.includes('linkedin')) return '#0a66c2';
+                    if (src.includes('facebook') || src.includes('fb')) return '#1877f2';
+                    if (src.includes('instagram') || src.includes('ig')) return '#e1306c';
+                    if (src.includes('youtube') || src.includes('yt')) return '#ff0000';
+                    if (src.includes('twitter') || src.includes('x.com')) return '#1da1f2';
+                    return '#7080a0';
+                });
+                makeChart('liSocialChart', 'bar', {
+                    labels: topChannels.map(c => c.source),
+                    datasets: [{ label: 'Sessions', data: topChannels.map(c => c.sessions), backgroundColor: bgColors, borderRadius: 4 }]
+                }, { ...baseOpts(), plugins: { legend: { display: false }, tooltip: { mode: 'index', intersect: false, callbacks: { afterLabel: ctx => `Users: ${fmt(topChannels[ctx.dataIndex].users)} | Views: ${fmt(topChannels[ctx.dataIndex].views)}` } } } });
+            }
+
+            // Device breakdown doughnut
+            if (LI_DEVICES.length) {
+                const deviceColors = { desktop: '#0a66c2', mobile: '#1b8fe0', tablet: '#3aa3e3' };
+                makeChart('liDeviceChart', 'doughnut', {
+                    labels: LI_DEVICES.map(d => d.device.charAt(0).toUpperCase() + d.device.slice(1)),
+                    datasets: [{ data: LI_DEVICES.map(d => d.sessions), backgroundColor: LI_DEVICES.map(d => deviceColors[d.device.toLowerCase()] || '#7080a0'), borderWidth: 2, borderColor: '#fff' }]
+                }, { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'right', labels: { font: { size: 11 }, boxWidth: 10 } }, tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toLocaleString()} sessions` } } } });
+
+                // Bench list
+                const benchEl = document.getElementById('liBenchList');
+                if (benchEl) {
+                    const total = LI_DEVICES.reduce((s, d) => s + d.sessions, 0);
+                    benchEl.innerHTML = LI_DEVICES.map(d => `
+                        <div class="bench-row">
+                            <span class="bench-label">${d.device.charAt(0).toUpperCase() + d.device.slice(1)}</span>
+                            <span class="bench-val">${fmt(d.sessions)} (${total > 0 ? ((d.sessions / total) * 100).toFixed(1) : 0}%)</span>
+                        </div>`).join('');
+                }
+            }
+
+            // Top landing pages table
+            const pagesEl = document.getElementById('liPagesTable');
+            const pagesND = document.getElementById('liPagesNoData');
+            if (pagesEl) {
+                pagesEl.innerHTML = '';
+                if (!LI_PAGES.length) {
+                    if (pagesND) pagesND.style.display = 'block';
+                } else {
+                    if (pagesND) pagesND.style.display = 'none';
+                    LI_PAGES.forEach((p, i) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td><span class="rank-badge">${i + 1}</span></td><td><span class="page-name">${p.path}</span></td><td style="font-size:11px;color:var(--text2);">${p.title || '—'}</td><td>${fmt(p.sessions)}</td><td>${fmt(p.views)}</td><td>${p.duration}s</td>`;
+                        pagesEl.appendChild(tr);
+                    });
+                }
+            }
+        }
+
+        // ── Apply live data payload ────────────────────────────────────────────────────
+        function applyDataset(payload) {
+            if (payload.GA4_DAILY?.length) GA4_DAILY = payload.GA4_DAILY;
+            if (payload.GA4_CHANNELS?.length) GA4_CHANNELS = payload.GA4_CHANNELS;
+            // FIX: this previously stashed pages on window._GA4_PAGES but the backend
+            // payload never contained a GA4_PAGES key, so the assignment never ran.
+            // Now wired into proper top-level state so both Top Pages tables populate.
+            if (payload.GA4_PAGES?.length) GA4_PAGES = payload.GA4_PAGES;
+            if (payload.FB_POSTS?.length) FB_POSTS = payload.FB_POSTS;
+            if (payload.IG_POSTS?.length) IG_POSTS = payload.IG_POSTS;
+            if (payload.YT_VIDEOS?.length) YT_VIDEOS = payload.YT_VIDEOS;
+            if (payload.summary) SUMMARY = { ...SUMMARY, ...payload.summary };
+            REF_DATE = computeRefDate();
+            dataLoaded = true;
+
+            const pill = document.getElementById('dataSourcePill');
+            pill.textContent = '🟢 Live Data';
+            pill.className = 'data-source-pill source-live';
+
+            if (payload.fetchedAt) {
+                document.getElementById('lastUpdated').textContent = `Updated ${new Date(payload.fetchedAt).toLocaleTimeString()}`;
+            }
+            if (payload.warnings?.length) showToast('Loaded with notes: ' + payload.warnings.join(' · '));
+        }
+
+        function showToast(msg, isError = false) {
+            const el = document.getElementById('refreshToast');
+            el.textContent = msg;
+            el.className = 'refresh-toast show' + (isError ? ' error' : '');
+            setTimeout(() => el.classList.remove('show'), 7000);
+        }
+
+        // ── Load cached data on startup ────────────────────────────────────────────────
+        async function loadCachedData() {
+            try {
+                const res = await fetch('/api/data');
+                if (!res.ok) return; // no cache — keep empty state
+                const payload = await res.json();
+                applyDataset(payload);
+                renderAll();
+            } catch {
+                // Running as static file or server not up — empty state is correct
+            }
+        }
+
+        // ── Refresh button ─────────────────────────────────────────────────────────────
+        document.getElementById('refreshBtn').addEventListener('click', async () => {
+            const btn = document.getElementById('refreshBtn');
+            const label = document.getElementById('refreshLabel');
+            btn.disabled = true;
+            btn.innerHTML = `<span class="spin">⏳</span> <span>Fetching live data…</span>`;
+            const pill = document.getElementById('dataSourcePill');
+            pill.textContent = '⏳ Fetching…';
+            pill.className = 'data-source-pill source-waiting';
+
+            try {
+                const res = await fetch('/api/refresh', { method: 'POST' });
+                const payload = await res.json();
+                if (!res.ok) throw new Error(payload.error || 'Refresh failed');
+                applyDataset(payload);
+                renderAll();
+                showToast(payload.warnings?.length ? 'Refreshed. Notes: ' + payload.warnings.join(' · ') : '✅ Live data refreshed successfully!');
+            } catch (err) {
+                const pill = document.getElementById('dataSourcePill');
+                pill.textContent = '❌ Error';
+                pill.className = 'data-source-pill source-error';
+                showToast('Refresh failed: ' + err.message + ' — is the server running? (npm start)', true);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = `🔄 <span id="refreshLabel">Refresh Live Data</span>`;
+            }
+        });
+
+        // ── Filter controls ────────────────────────────────────────────────────────────
+        document.querySelectorAll('.fpill').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.fpill').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                const days = btn.dataset.days;
+                const wrap = document.getElementById('customRangeWrap');
+                if (days === 'custom') {
+                    wrap.classList.add('visible');
+                    activeFilter = { days: 'custom', start: document.getElementById('customStart').value, end: document.getElementById('customEnd').value };
+                } else {
+                    wrap.classList.remove('visible');
+                    activeFilter = { days: days === 'all' ? 'all' : +days, start: null, end: null };
+                    if (dataLoaded) renderAll();
+                }
+            });
+        });
+        document.getElementById('applyCustom').addEventListener('click', () => {
+            const s = document.getElementById('customStart').value, e = document.getElementById('customEnd').value;
+            if (s && e && s <= e) { activeFilter = { days: 'custom', start: s, end: e }; if (dataLoaded) renderAll(); }
+        });
+
+        // ── Tab switching ──────────────────────────────────────────────────────────────
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+                tab.classList.add('active');
+                const panel = document.getElementById('tab-' + tab.dataset.tab);
+                if (panel) panel.classList.add('active');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        // Set default custom date range inputs to today and 31 days ago
+        const today = new Date().toISOString().slice(0, 10);
+        const d31 = new Date(); d31.setDate(d31.getDate() - 30);
+        document.getElementById('customEnd').value = today;
+        document.getElementById('customStart').value = d31.toISOString().slice(0, 10);
+
+        // Boot
+        loadCachedData();
+    </script>
+</body>
+
+</html>
