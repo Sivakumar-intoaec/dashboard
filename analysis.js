@@ -7,28 +7,46 @@
  */
 
 import axios from 'axios';
-import ExcelJS from 'exceljs';
 import dotenv from 'dotenv';
-import fs from 'fs/promises';
+import { google } from 'googleapis';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { google } from 'googleapis';
 
-dotenv.config();
+const FETCH_CONCURRENCY = 50;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+dotenv.config({ path: path.join(__dirname, '.env') });
+
+function normalizeEnvValue(value) {
+  if (typeof value !== 'string') return '';
+  return value.trim().replace(/^['"]|['"]$/g, '');
+}
+
+function normalizePropertyId(value) {
+  const normalized = normalizeEnvValue(value);
+  return normalized.replace(/^properties\//i, '');
+}
+
 const GRAPH_API_VERSION = 'v20.0';
 const BASE_URL = `https://graph.facebook.com/${GRAPH_API_VERSION}`;
-const OUTPUT_DIR = path.join(__dirname, 'output');
-const OUTPUT_FILE = path.join(OUTPUT_DIR, 'social_media_analytics.xlsx');
+const YOUTUBE_ANALYTICS_SCOPES = [
+  'https://www.googleapis.com/auth/youtube.readonly',
+  'https://www.googleapis.com/auth/yt-analytics.readonly'
+];
+
+const rawEnv = Object.fromEntries(
+  Object.entries(process.env).map(([key, value]) => [key, normalizeEnvValue(value)])
+);
 
 const {
   PAGE_ID, IG_USER_ID, ACCESS_TOKEN,
-  GA_PROPERTY_ID, YOUTUBE_API_KEY, YOUTUBE_CHANNEL_HANDLE,
+  GA_PROPERTY_ID, YOUTUBE_CHANNEL_HANDLE,
   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN
-} = process.env;
+} = rawEnv;
+
+const NORMALIZED_GA_PROPERTY_ID = normalizePropertyId(GA_PROPERTY_ID);
 
 // ─── Google OAuth ────────────────────────────────────────────────────────────
 let oauth2Client = null;
@@ -45,12 +63,28 @@ function initGoogle() {
     analyticsData = google.analyticsdata({ version: 'v1beta', auth: oauth2Client });
     youtubeAnalytics = google.youtubeAnalytics({ version: 'v2', auth: oauth2Client });
     console.log('✅ OAuth configured for GA4 + YouTube Analytics');
+    console.log(`   Required YouTube scope: ${YOUTUBE_ANALYTICS_SCOPES[1]}`);
+    console.log(`   GA4 property ID resolved to: ${NORMALIZED_GA_PROPERTY_ID || '(none)'}`);
+    if (GA_PROPERTY_ID && GA_PROPERTY_ID !== NORMALIZED_GA_PROPERTY_ID) {
+      console.log(`   GA4 property ID normalized from: ${GA_PROPERTY_ID}`);
+    }
   } else {
     console.log('⚠️  OAuth not fully configured — GA4 & YouTube Analytics will be skipped.');
   }
 }
 
-const youtubePublicApi = () => google.youtube({ version: 'v3', auth: YOUTUBE_API_KEY });
+function formatYouTubeAnalyticsError(err) {
+  const message = err?.message || '';
+  if (/insufficient permission|permission|scope/i.test(message)) {
+    return 'YouTube Analytics scope not granted. Re-authorize the Google account with the yt-analytics.readonly scope.';
+  }
+  return message;
+}
+
+const youtubePublicApi = () => {
+  if (!oauth2Client) return null;
+  return google.youtube({ version: 'v3', auth: oauth2Client });
+};
 
 // ─── Facebook ────────────────────────────────────────────────────────────────
 let PAGE_TOKEN = null;
@@ -263,7 +297,7 @@ async function getGA4Metrics(startDate = '30daysAgo', endDate = 'today') {
   if (!analyticsData) return [];
   try {
     const res = await analyticsData.properties.runReport({
-      property: `properties/${GA_PROPERTY_ID}`,
+      property: `properties/${NORMALIZED_GA_PROPERTY_ID}`,
       requestBody: {
         dateRanges: [{ startDate, endDate }],
         dimensions: [{ name: 'date' }],
@@ -282,7 +316,7 @@ async function getGA4TrafficSources(startDate = '30daysAgo', endDate = 'today') 
   if (!analyticsData) return [];
   try {
     const res = await analyticsData.properties.runReport({
-      property: `properties/${GA_PROPERTY_ID}`,
+      property: `properties/${NORMALIZED_GA_PROPERTY_ID}`,
       requestBody: {
         dateRanges: [{ startDate, endDate }],
         dimensions: [{ name: 'sessionDefaultChannelGroup' }],
@@ -299,7 +333,7 @@ async function getGA4TopPages(startDate = '365daysAgo', endDate = 'today') {
   if (!analyticsData) return [];
   try {
     const res = await analyticsData.properties.runReport({
-      property: `properties/${GA_PROPERTY_ID}`,
+      property: `properties/${NORMALIZED_GA_PROPERTY_ID}`,
       requestBody: {
         dateRanges: [{ startDate, endDate }],
         dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
@@ -320,7 +354,7 @@ async function getLinkedInDailyMetrics(startDate = '90daysAgo', endDate = 'today
   if (!analyticsData) return [];
   try {
     const res = await analyticsData.properties.runReport({
-      property: `properties/${GA_PROPERTY_ID}`,
+      property: `properties/${NORMALIZED_GA_PROPERTY_ID}`,
       requestBody: {
         dateRanges: [{ startDate, endDate }],
         dimensions: [{ name: 'date' }],
@@ -345,7 +379,7 @@ async function getLinkedInTopPages(startDate = '365daysAgo', endDate = 'today') 
   if (!analyticsData) return [];
   try {
     const res = await analyticsData.properties.runReport({
-      property: `properties/${GA_PROPERTY_ID}`,
+      property: `properties/${NORMALIZED_GA_PROPERTY_ID}`,
       requestBody: {
         dateRanges: [{ startDate, endDate }],
         dimensions: [{ name: 'pagePath' }, { name: 'pageTitle' }],
@@ -368,7 +402,7 @@ async function getLinkedInVsSocialChannels(startDate = '90daysAgo', endDate = 't
   if (!analyticsData) return [];
   try {
     const res = await analyticsData.properties.runReport({
-      property: `properties/${GA_PROPERTY_ID}`,
+      property: `properties/${NORMALIZED_GA_PROPERTY_ID}`,
       requestBody: {
         dateRanges: [{ startDate, endDate }],
         dimensions: [{ name: 'sessionSource' }],
@@ -391,7 +425,7 @@ async function getLinkedInDeviceBreakdown(startDate = '90daysAgo', endDate = 'to
   if (!analyticsData) return [];
   try {
     const res = await analyticsData.properties.runReport({
-      property: `properties/${GA_PROPERTY_ID}`,
+      property: `properties/${NORMALIZED_GA_PROPERTY_ID}`,
       requestBody: {
         dateRanges: [{ startDate, endDate }],
         dimensions: [{ name: 'deviceCategory' }],
@@ -411,6 +445,7 @@ async function getLinkedInDeviceBreakdown(startDate = '90daysAgo', endDate = 'to
 // ─── YouTube ─────────────────────────────────────────────────────────────────
 async function getYouTubeChannelId() {
   const yt = youtubePublicApi();
+  if (!yt) throw new Error('YouTube OAuth not configured');
   const res = await yt.channels.list({ part: 'id', forHandle: YOUTUBE_CHANNEL_HANDLE.replace('@', '') });
   const id = res.data.items?.[0]?.id;
   if (!id) throw new Error('YouTube channel not found');
@@ -420,12 +455,14 @@ async function getYouTubeChannelId() {
 
 async function getYouTubePublicStats(channelId) {
   const yt = youtubePublicApi();
+  if (!yt) throw new Error('YouTube OAuth not configured');
   const res = await yt.channels.list({ part: 'statistics,snippet,brandingSettings,contentDetails', id: channelId });
   return res.data.items?.[0] || null;
 }
 
 async function fetchYouTubeAllVideos(uploadsPlaylistId) {
   const yt = youtubePublicApi();
+  if (!yt) throw new Error('YouTube OAuth not configured');
   let videos = [];
   let nextPageToken = null;
   do {
@@ -454,174 +491,38 @@ async function fetchYouTubeAllVideos(uploadsPlaylistId) {
 }
 
 async function getYouTubeAnalytics(channelId, startDate, endDate) {
-  if (!youtubeAnalytics) return [];
+  if (!youtubeAnalytics) return { rows: [], error: null };
   try {
     const res = await youtubeAnalytics.reports.query({
       ids: `channel==${channelId}`, startDate, endDate,
       metrics: 'views,estimatedMinutesWatched,averageViewDuration,subscribersGained,subscribersLost,likes,shares,comments',
       dimensions: 'day'
     });
-    return res.data.rows || [];
-  } catch (err) { console.warn('⚠️  YT Analytics:', err.message); return []; }
+    return { rows: res.data.rows || [], error: null };
+  } catch (err) {
+    const error = formatYouTubeAnalyticsError(err);
+    console.warn(`⚠️  YT Analytics unavailable: ${error}`);
+    return { rows: [], error };
+  }
 }
 
 async function getYouTubeTopVideos(channelId, startDate, endDate) {
-  if (!youtubeAnalytics) return [];
+  if (!youtubeAnalytics) return { rows: [], error: null };
   try {
     const res = await youtubeAnalytics.reports.query({
       ids: `channel==${channelId}`, startDate, endDate,
       metrics: 'views,estimatedMinutesWatched,likes,comments,shares',
       dimensions: 'video', sort: '-views', maxResults: 15
     });
-    return res.data.rows || [];
-  } catch (err) { console.warn('⚠️  YT Top Videos:', err.message); return []; }
+    return { rows: res.data.rows || [], error: null };
+  } catch (err) {
+    const error = formatYouTubeAnalyticsError(err);
+    console.warn(`⚠️  YT Top Videos unavailable: ${error}`);
+    return { rows: [], error };
+  }
 }
 
-// ─── Excel export (unchanged from your original) ─────────────────────────────
-async function generateExcel(fbData, igData, gaData, ytData) {
-  const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'IntoAEC Analytics';
-  workbook.created = new Date();
-
-  const hdr = (sheet) => {
-    sheet.getRow(1).font = { bold: true };
-    sheet.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFD3D3D3' } };
-  };
-
-  if (fbData) {
-    const { pageInfo, kpis, posts } = fbData;
-    const s1 = workbook.addWorksheet('FB Summary');
-    s1.columns = [{ header: 'Metric', key: 'metric', width: 25 }, { header: 'Value', key: 'value', width: 45 }];
-    s1.addRows([
-      { metric: 'Page Name', value: pageInfo.name },
-      { metric: 'Username', value: pageInfo.username || 'N/A' },
-      { metric: 'Page Fans', value: pageInfo.fan_count },
-      { metric: 'Followers', value: pageInfo.followers_count },
-      { metric: 'Total Impressions (28d)', value: kpis.totalImpressions },
-      { metric: 'Total Reach (28d)', value: kpis.totalReach },
-      { metric: 'Total Likes', value: kpis.totalLikes },
-      { metric: 'Total Comments', value: kpis.totalComments },
-      { metric: 'Total Shares', value: kpis.totalShares },
-    ]);
-    hdr(s1);
-
-    const s2 = workbook.addWorksheet('FB Posts');
-    s2.columns = [
-      { header: 'ID', key: 'id', width: 30 }, { header: 'Type', key: 'type', width: 12 },
-      { header: 'Date', key: 'date', width: 15 }, { header: 'Message', key: 'caption', width: 60 },
-      { header: 'Likes', key: 'likes', width: 10 }, { header: 'Comments', key: 'comments', width: 12 },
-      { header: 'Shares', key: 'shares', width: 10 }, { header: 'Impressions', key: 'impressions', width: 14 },
-      { header: 'Reach', key: 'reach', width: 12 }, { header: 'Engaged Users', key: 'engaged', width: 14 },
-      { header: 'URL', key: 'url', width: 45 }
-    ];
-    posts.forEach(p => s2.addRow(p));
-    hdr(s2);
-  }
-
-  if (igData) {
-    const { accountInfo, kpis, posts, audience } = igData;
-    const s3 = workbook.addWorksheet('IG Summary');
-    s3.columns = [{ header: 'Metric', key: 'metric', width: 25 }, { header: 'Value', key: 'value', width: 45 }];
-    s3.addRows([
-      { metric: 'Username', value: accountInfo.username },
-      { metric: 'Followers', value: accountInfo.followers_count },
-      { metric: 'Following', value: accountInfo.follows_count },
-      { metric: 'Total Posts', value: accountInfo.media_count },
-      { metric: 'Total Likes', value: kpis.totalLikes },
-      { metric: 'Total Comments', value: kpis.totalComments },
-      { metric: 'Avg Engagement Rate %', value: kpis.avgEngagementRate },
-    ]);
-    hdr(s3);
-
-    const s4 = workbook.addWorksheet('IG Posts & Reels');
-    s4.columns = [
-      { header: 'ID', key: 'id', width: 25 }, { header: 'Type', key: 'type', width: 12 },
-      { header: 'Date', key: 'date', width: 15 }, { header: 'Caption', key: 'caption', width: 50 },
-      { header: 'Likes', key: 'likes', width: 10 }, { header: 'Comments', key: 'comments', width: 12 },
-      { header: 'Shares', key: 'shares', width: 10 }, { header: 'Saves', key: 'saves', width: 10 },
-      { header: 'Video Views', key: 'videoViews', width: 14 }, { header: 'URL', key: 'url', width: 45 }
-    ];
-    posts.forEach(p => s4.addRow(p));
-    hdr(s4);
-
-    const s5 = workbook.addWorksheet('IG Audience');
-    s5.columns = [{ header: 'Type', key: 'type', width: 15 }, { header: 'Location', key: 'location', width: 30 }, { header: 'Count', key: 'count', width: 15 }];
-    audience.topCountries.forEach(i => s5.addRow({ type: 'Country', ...i }));
-    audience.topCities.forEach(i => s5.addRow({ type: 'City', ...i }));
-    hdr(s5);
-  }
-
-  if (gaData) {
-    const { metrics, traffic, pages } = gaData;
-    if (metrics.length) {
-      const s6 = workbook.addWorksheet('GA4 Daily');
-      s6.columns = [
-        { header: 'Date', key: 'date', width: 15 }, { header: 'Active Users', key: 'activeUsers', width: 15 },
-        { header: 'New Users', key: 'newUsers', width: 15 }, { header: 'Sessions', key: 'sessions', width: 15 },
-        { header: 'Page Views', key: 'pageViews', width: 15 }, { header: 'Bounce Rate', key: 'bounceRate', width: 15 },
-        { header: 'Avg Duration (s)', key: 'avgDuration', width: 18 }, { header: 'Conversions', key: 'conversions', width: 15 }
-      ];
-      metrics.forEach(row => s6.addRow({
-        date: row.dimensionValues[0].value,
-        activeUsers: +row.metricValues[0].value,
-        newUsers: +row.metricValues[1].value,
-        sessions: +row.metricValues[2].value,
-        pageViews: +row.metricValues[3].value,
-        bounceRate: +parseFloat(row.metricValues[4].value).toFixed(2),
-        avgDuration: +parseFloat(row.metricValues[5].value).toFixed(1),
-        conversions: +row.metricValues[6].value
-      }));
-      hdr(s6);
-    }
-    if (traffic.length) {
-      const s7 = workbook.addWorksheet('GA4 Traffic');
-      s7.columns = [{ header: 'Channel', key: 'channel', width: 30 }, { header: 'Sessions', key: 'sessions', width: 15 }];
-      traffic.forEach(r => s7.addRow({ channel: r.dimensionValues[0].value, sessions: +r.metricValues[0].value }));
-      hdr(s7);
-    }
-    if (pages.length) {
-      const s8 = workbook.addWorksheet('GA4 Top Pages');
-      s8.columns = [
-        { header: 'Page Path', key: 'path', width: 40 }, { header: 'Page Title', key: 'title', width: 45 },
-        { header: 'Views', key: 'views', width: 15 }, { header: 'Avg Duration (s)', key: 'duration', width: 18 }
-      ];
-      pages.forEach(r => s8.addRow({ path: r.dimensionValues[0].value, title: r.dimensionValues[1].value, views: +r.metricValues[0].value, duration: +parseFloat(r.metricValues[1].value).toFixed(1) }));
-      hdr(s8);
-    }
-  }
-
-  if (ytData) {
-    const { channel, analytics, topVideos, allVideos } = ytData;
-    if (channel) {
-      const s9 = workbook.addWorksheet('YT Overview');
-      s9.columns = [{ header: 'Metric', key: 'metric', width: 25 }, { header: 'Value', key: 'value', width: 60 }];
-      s9.addRows([
-        { metric: 'Channel Name', value: channel.snippet.title },
-        { metric: 'Handle', value: YOUTUBE_CHANNEL_HANDLE },
-        { metric: 'Total Subscribers', value: +channel.statistics.subscriberCount },
-        { metric: 'Total Views', value: +channel.statistics.viewCount },
-        { metric: 'Total Videos', value: +channel.statistics.videoCount },
-        { metric: 'Published At', value: channel.snippet.publishedAt },
-      ]);
-      hdr(s9);
-    }
-    if (allVideos?.length) {
-      const s10 = workbook.addWorksheet('YT All Videos');
-      s10.columns = [
-        { header: 'Title', key: 'title', width: 55 }, { header: 'Date', key: 'date', width: 15 },
-        { header: 'Type', key: 'type', width: 10 }, { header: 'Views', key: 'views', width: 12 },
-        { header: 'Likes', key: 'likes', width: 10 }, { header: 'Comments', key: 'comments', width: 12 },
-        { header: 'URL', key: 'url', width: 45 }
-      ];
-      allVideos.forEach(v => s10.addRow(v));
-      hdr(s10);
-    }
-  }
-
-  await fs.mkdir(OUTPUT_DIR, { recursive: true });
-  await workbook.xlsx.writeFile(OUTPUT_FILE);
-  console.log(`📊 Excel saved: ${OUTPUT_FILE}`);
-}
+// Live data is returned directly from the analytics pipeline without writing Excel or cache files.
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
@@ -632,8 +533,6 @@ const sleep = (ms) => new Promise(r => setTimeout(r, ms));
  * 10 concurrent requests is a safe, fast default; bump to 15-20 if you see no
  * rate-limit errors (HTTP 429) in the output.
  */
-const FETCH_CONCURRENCY = 10;
-
 /**
  * parallelMap — like Promise.all but with a sliding concurrency window.
  * Processes `items` by calling `fn(item, index)` with at most `limit`
@@ -665,7 +564,7 @@ function getDateRange(days = 30) {
 }
 
 // ─── Shape data for the dashboard ───────────────────────────────────────────
-function shapeDashboardPayload({ fbData, igData, gaData, ytData, liData, warnings }) {
+function shapeDashboardPayload({ fbData, igData, gaData, ytData, liData = null, warnings } = {}) {
   const payload = {
     fetchedAt: new Date().toISOString(),
     warnings,
@@ -848,7 +747,7 @@ export async function runAnalytics() {
   igData = igResult;
 
   // ── GA4 ──
-  if (GA_PROPERTY_ID && analyticsData) {
+  if (NORMALIZED_GA_PROPERTY_ID && analyticsData) {
     try {
       console.log('\n─── Google Analytics 4 ───');
       const [metrics, traffic, pages] = await Promise.all([
@@ -863,7 +762,7 @@ export async function runAnalytics() {
   // LinkedIn data removed
 
   // ── YouTube ──
-  if (YOUTUBE_API_KEY && YOUTUBE_CHANNEL_HANDLE) {
+  if (YOUTUBE_CHANNEL_HANDLE && oauth2Client) {
     try {
       console.log('\n─── YouTube ───');
       const { startDate, endDate } = getDateRange(90);
@@ -871,16 +770,15 @@ export async function runAnalytics() {
       const channel = await getYouTubePublicStats(channelId);
       const uploadsPlaylistId = channel?.contentDetails?.relatedPlaylists?.uploads;
       const allVideos = uploadsPlaylistId ? await fetchYouTubeAllVideos(uploadsPlaylistId) : [];
-      const [analytics, topVideos] = await Promise.all([
+      const [analyticsResult, topVideosResult] = await Promise.all([
         getYouTubeAnalytics(channelId, startDate, endDate),
         getYouTubeTopVideos(channelId, startDate, endDate)
       ]);
-      ytData = { channel, analytics, topVideos, allVideos };
+      const ytWarnings = [analyticsResult.error, topVideosResult.error].filter(Boolean);
+      ytWarnings.forEach(message => warnings.push(`YT: ${message}`));
+      ytData = { channel, analytics: analyticsResult.rows, topVideos: topVideosResult.rows, allVideos };
     } catch (err) { warnings.push(`YT: ${err.message}`); console.error('⚠️  YT skipped:', err.message); }
-  } else { warnings.push('YT skipped: missing API key or channel handle'); }
+  } else { warnings.push('YT skipped: missing channel handle or OAuth'); }
 
-  // ── Excel (fire-and-forget alongside the JSON response) ──
-  generateExcel(fbData, igData, gaData, ytData).catch(e => console.error('Excel write failed:', e.message));
-
-  return shapeDashboardPayload({ fbData, igData, gaData, ytData, liData, warnings });
+  return shapeDashboardPayload({ fbData, igData, gaData, ytData, liData: liData ?? null, warnings });
 }

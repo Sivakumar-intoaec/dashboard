@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "fetch": "node analytics.js"
+    "fetch": "node analysis.js"
   },
   "dependencies": {
     "axios": "^1.7.2",

@@ -6,7 +6,6 @@
 import express from 'express';
 import cors from 'cors';
 import path from 'path';
-import fs from 'fs/promises';
 import { fileURLToPath } from 'url';
 import { runAnalytics } from './analysis.js';
 
@@ -15,7 +14,6 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const DEFAULT_PORT = Number(process.env.PORT) || 3000;
-const CACHE_FILE = path.join(__dirname, 'output', 'dashboard_cache.json');
 
 app.use(express.json());
 app.use(cors());
@@ -26,29 +24,24 @@ app.get('/', (req, res) => {
 });
 
 // GET /api/data
-// Returns cached data if available, so the dashboard can show real data
-// immediately on page load.
+// Fetches fresh analytics data on demand and returns it directly.
 app.get('/api/data', async (req, res) => {
     try {
-        const raw = await fs.readFile(CACHE_FILE, 'utf8');
-        const payload = JSON.parse(raw);
+        const payload = await runAnalytics();
         return res.json(payload);
-    } catch {
-        return res.status(404).json({ error: 'No cached data yet. Click Refresh Live Data.' });
+    } catch (err) {
+        console.error('Data fetch failed:', err.message);
+        return res.status(500).json({ error: err.message });
     }
 });
 
 // POST /api/refresh
-// Triggers a full analytics fetch, saves result to cache, returns it.
+// Fetches fresh analytics data and returns it without storing it.
 app.post('/api/refresh', async (req, res) => {
     console.log('\nRefreshing dashboard live data...');
     try {
         const payload = await runAnalytics();
-
-        await fs.mkdir(path.join(__dirname, 'output'), { recursive: true });
-        await fs.writeFile(CACHE_FILE, JSON.stringify(payload, null, 2));
-
-        console.log('Refresh complete - cache updated.');
+        console.log('Refresh complete.');
         return res.json(payload);
     } catch (err) {
         console.error('Refresh failed:', err.message);
