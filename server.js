@@ -7,7 +7,7 @@ import express from 'express';
 import cors from 'cors';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { runAnalytics, runGA4Countries } from './analysis.js';
+import { runAnalytics, runGA4Countries, getGA4DimensionValues, getFilteredGA4Data } from './analysis.js';
 import { runGSC, listSites, runIndexingStatus, getIndexingData, inspectSingleUrl, inspectSingleUrlWithCache, isUrlInProperty, mapUrlInspectionError, fetchCoreWebVitals } from './gsc.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -60,6 +60,39 @@ app.get('/api/analytics/countries', async (req, res) => {
     } catch (err) {
         console.error('Countries fetch failed:', err.message);
         return res.status(500).json({ error: err.message });
+    }
+});
+
+// GET /api/analytics/dimension-values
+// Returns distinct available values from GA4 for a specified dimension (e.g. country, sessionSource, deviceCategory)
+app.get('/api/analytics/dimension-values', async (req, res) => {
+    const dimension = req.query.dimension;
+    const startDate = req.query.startDate || '90daysAgo';
+    const endDate = req.query.endDate || 'today';
+    if (!dimension) {
+        return res.status(400).json({ success: false, error: 'Dimension parameter is required' });
+    }
+    try {
+        const values = await getGA4DimensionValues(dimension, startDate, endDate);
+        return res.json({ success: true, data: values });
+    } catch (err) {
+        console.error(`Dimension values fetch failed (${dimension}):`, err.message);
+        return res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// POST /api/analytics/filter
+// Returns filtered GA4 dashboard metrics, charts, top pages, and country distribution
+app.post('/api/analytics/filter', async (req, res) => {
+    const filters = req.body.filters || {};
+    const startDate = req.body.startDate || '90daysAgo';
+    const endDate = req.body.endDate || 'today';
+    try {
+        const data = await getFilteredGA4Data(filters, startDate, endDate);
+        return res.json({ success: true, data });
+    } catch (err) {
+        console.error('Filtered GA4 data fetch failed:', err.message);
+        return res.status(500).json({ success: false, error: err.message });
     }
 });
 

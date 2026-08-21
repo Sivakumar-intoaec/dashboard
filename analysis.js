@@ -711,6 +711,198 @@ function shapeDashboardPayload({ fbData, igData, gaData, ytData, liData = null, 
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────────
+const GA4_DIMENSION_MAP = {
+  country: 'country',
+  region: 'region',
+  city: 'city',
+  continent: 'continent',
+  sessionSource: 'sessionSource',
+  sessionMedium: 'sessionMedium',
+  sessionSourceMedium: 'sessionSourceMedium',
+  sessionCampaignName: 'sessionCampaignName',
+  sessionDefaultChannelGroup: 'sessionDefaultChannelGroup',
+  deviceCategory: 'deviceCategory',
+  operatingSystem: 'operatingSystem',
+  browser: 'browser',
+  platform: 'platform'
+};
+
+export async function getGA4DimensionValues(dimensionKey, startDate = '90daysAgo', endDate = 'today') {
+  initGoogle();
+  if (!analyticsData || !NORMALIZED_GA_PROPERTY_ID) {
+    throw new Error('GA4 not configured — check GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, and GA_PROPERTY_ID in .env');
+  }
+  const fieldName = GA4_DIMENSION_MAP[dimensionKey] || dimensionKey;
+  try {
+    const res = await analyticsData.properties.runReport({
+      property: `properties/${NORMALIZED_GA_PROPERTY_ID}`,
+      requestBody: {
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: fieldName }],
+        metrics: [{ name: 'activeUsers' }],
+        orderBys: [{ metric: { metricName: 'activeUsers' }, desc: true }],
+        limit: 250
+      }
+    });
+    const rows = res.data.rows || [];
+    return rows.map(r => ({
+      value: r.dimensionValues[0]?.value || '(not set)',
+      count: +r.metricValues[0]?.value || 0
+    })).filter(item => item.value && item.value !== '(not set)');
+  } catch (err) {
+    console.error(`❌ GA4 dimension values error (${dimensionKey}):`, err.message);
+    throw err;
+  }
+}
+
+function buildGA4DimensionFilter(filters) {
+  if (!filters || typeof filters !== 'object') return null;
+
+  const expressions = [];
+
+  for (const [key, rawValues] of Object.entries(filters)) {
+    const fieldName = GA4_DIMENSION_MAP[key] || key;
+    const values = Array.isArray(rawValues) ? rawValues.filter(Boolean) : (rawValues ? [rawValues] : []);
+    if (values.length === 0) continue;
+
+    if (values.length === 1) {
+      expressions.push({
+        filter: {
+          fieldName,
+          stringFilter: {
+            matchType: 'EXACT',
+            value: values[0],
+            caseSensitive: false
+          }
+        }
+      });
+    } else {
+      expressions.push({
+        filter: {
+          fieldName,
+          inListFilter: {
+            values: values,
+            caseSensitive: false
+          }
+        }
+      });
+    }
+  }
+
+  if (expressions.length === 0) return null;
+  if (expressions.length === 1) return expressions[0];
+  return {
+    andGroup: {
+      expressions
+    }
+  };
+}
+
+export async function getFilteredGA4Data(filters = {}, startDate = '90daysAgo', endDate = 'today') {
+  initGoogle();
+  if (!analyticsData || !NORMALIZED_GA_PROPERTY_ID) {
+    throw new Error('GA4 not configured — check GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, and GA_PROPERTY_ID in .env');
+  }
+
+  const dimensionFilter = buildGA4DimensionFilter(filters);
+
+  // Extract active filter dimensions to include as secondary dimensions if present
+  const activeFilterKeys = Object.keys(filters).filter(k => filters[k] && (Array.isArray(filters[k]) ? filters[k].length > 0 : Boolean(filters[k])));
+  const primarySecondaryDimKey = activeFilterKeys.length > 0 ? (GA4_DIMENSION_MAP[activeFilterKeys[0]] || activeFilterKeys[0]) : null;
+
+  const pageDimensions = [{ name: 'pagePath' }, { name: 'pageTitle' }];
+  if (primarySecondaryDimKey && primarySecondaryDimKey !== 'pagePath' && primarySecondaryDimKey !== 'pageTitle') {
+    pageDimensions.push({ name: primarySecondaryDimKey });
+  }
+
+  const requestBodyMetrics = {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'date' }],
+    metrics: [
+      { name: 'activeUsers' }, { name: 'newUsers' }, { name: 'sessions' },
+      { name: 'screenPageViews' }, { name: 'bounceRate' },
+      { name: 'averageSessionDuration' }, { name: 'conversions' }
+    ],
+    ...(dimensionFilter ? { dimensionFilter } : {})
+  };
+
+  const requestBodyTraffic = {
+    dateRanges: [{ startDate, endDate }],
+    dimensions: [{ name: 'sessionDefaultChannelGroup' }],
+    metrics: [{ name: 'sessions' }],
+    orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+    limit: 10,
+    ...(dimensionFilter ? { dimensionFilter } : {})
+  };
+
+  const requestBodyPages = {
+    dateRanges: [{ startDate: '365daysAgo', endDate: 'today' }],
+    dimensions: pageDimensions,
+    metrics: [{ name: 'screenPageViews' }, { name: 'averageSessionDuration' }],
+    orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+    limit: 15,
+    ...(dimensionFilter ? { dimensionFilter } : {})
+  };
+
+  const requestBodyCountries = {
+    dateRanges: [{ startDate: '2020-01-01', endDate: 'today' }],
+    dimensions: [{ name: 'country' }],
+    metrics: [{ name: 'screenPageViews' }],
+    orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+    limit: 15,
+    ...(dimensionFilter ? { dimensionFilter } : {})
+  };
+
+  const [metricsRes, trafficRes, pagesRes, countriesRes] = await Promise.all([
+    analyticsData.properties.runReport({ property: `properties/${NORMALIZED_GA_PROPERTY_ID}`, requestBody: requestBodyMetrics }).catch(err => { console.error('❌ Filtered GA4 metrics:', err.message); return { data: {} }; }),
+    analyticsData.properties.runReport({ property: `properties/${NORMALIZED_GA_PROPERTY_ID}`, requestBody: requestBodyTraffic }).catch(err => { console.error('❌ Filtered GA4 traffic:', err.message); return { data: {} }; }),
+    analyticsData.properties.runReport({ property: `properties/${NORMALIZED_GA_PROPERTY_ID}`, requestBody: requestBodyPages }).catch(err => { console.error('❌ Filtered GA4 pages:', err.message); return { data: {} }; }),
+    analyticsData.properties.runReport({ property: `properties/${NORMALIZED_GA_PROPERTY_ID}`, requestBody: requestBodyCountries }).catch(err => { console.error('❌ Filtered GA4 countries:', err.message); return { data: {} }; })
+  ]);
+
+  const metricsRows = metricsRes.data?.rows || [];
+  const trafficRows = trafficRes.data?.rows || [];
+  const pagesRows = pagesRes.data?.rows || [];
+  const countriesRows = countriesRes.data?.rows || [];
+
+  const GA4_DAILY = metricsRows.map(row => ({
+    date: row.dimensionValues[0].value.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
+    users: +row.metricValues[0].value,
+    newUsers: +row.metricValues[1].value,
+    sessions: +row.metricValues[2].value,
+    views: +row.metricValues[3].value,
+    bounceRate: +parseFloat(row.metricValues[4].value).toFixed(2),
+    dur: +parseFloat(row.metricValues[5].value).toFixed(1),
+    conversions: +row.metricValues[6].value
+  })).sort((a, b) => a.date.localeCompare(b.date));
+
+  const GA4_CHANNELS = trafficRows.map(r => ({
+    channel: r.dimensionValues[0].value,
+    sessions: +r.metricValues[0].value
+  }));
+
+  const GA4_PAGES = pagesRows.map(r => ({
+    path: r.dimensionValues[0]?.value || '',
+    title: r.dimensionValues[1]?.value || '',
+    secondaryDimKey: activeFilterKeys[0] || null,
+    secondaryDimVal: primarySecondaryDimKey && r.dimensionValues[2] ? r.dimensionValues[2].value : (activeFilterKeys.length > 0 && Array.isArray(filters[activeFilterKeys[0]]) ? filters[activeFilterKeys[0]].join(', ') : null),
+    views: +r.metricValues[0]?.value || 0,
+    duration: +parseFloat(r.metricValues[1]?.value || 0).toFixed(1)
+  }));
+
+  const GA4_COUNTRIES = countriesRows.map(r => ({
+    country: r.dimensionValues[0].value,
+    views: +r.metricValues[0].value
+  }));
+
+  return {
+    GA4_DAILY,
+    GA4_CHANNELS,
+    GA4_PAGES,
+    GA4_COUNTRIES
+  };
+}
+
 /**
  * Fetches the top 15 countries by page views (all-time) from the GA4 property.
  * Reuses the same OAuth client and property ID as runAnalytics().
