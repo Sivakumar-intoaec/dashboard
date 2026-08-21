@@ -462,6 +462,14 @@
             color: var(--muted);
             line-height: 1.6;
             max-width: 420px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        @keyframes psBarProgress {
+            0% { left: -40%; width: 40%; }
+            50% { left: 30%; width: 50%; }
+            100% { left: 100%; width: 40%; }
         }
 
         .empty-state .es-btn {
@@ -1873,6 +1881,7 @@
         <div class="nav-tab" data-tab="ig"><span class="tab-icon">📸</span>Instagram</div>
         <div class="nav-tab" data-tab="yt"><span class="tab-icon">▶️</span>YouTube</div>
         <div class="nav-tab" data-tab="gsc"><span class="tab-icon">🔍</span>Search Console</div>
+        <div class="nav-tab" data-tab="page-performance"><span class="tab-icon">⚡</span>Page Performance</div>
         <div class="nav-tab" data-tab="weekly"><span class="tab-icon">📊</span>Weekly Comparison</div>
     </div>
 
@@ -3095,6 +3104,261 @@
                             <div class="card-subtitle">Active users, daily</div>
                         </div>
                         <div class="chart-wrap" style="height:260px;"><canvas id="weeklyGaChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- PAGE PERFORMANCE (PageSpeed Insights & Web Vitals) -->
+        <section class="tab-panel" id="tab-page-performance">
+            <div class="section-header">
+                <div class="section-icon icon-wk" style="background: linear-gradient(135deg, #fff7ed, #ffedd5); color: #ea580c;">⚡</div>
+                <div class="section-title-block">
+                    <h2>Page Performance</h2>
+                    <p id="psSubTitle">Google PageSpeed Insights &amp; Web Vitals Analysis</p>
+                </div>
+                <div class="section-line"></div>
+                <span class="range-tag" id="psStrategyTag">Mobile</span>
+                <button class="gsc-refresh-btn" id="psRefreshBtn" style="background: linear-gradient(135deg, #ea580c, #c2410c); border-color: #ea580c;">🔄 Refresh Analysis</button>
+            </div>
+
+            <!-- CONTROL TOOLBAR -->
+            <div class="ga-filter-toolbar" style="padding: 16px; margin-bottom: 24px;">
+                <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 280px; position: relative;">
+                        <input type="url" id="psUrlInput" value="https://intoaec.ai/" placeholder="Enter website URL (e.g. https://intoaec.ai/)" 
+                            style="width: 100%; padding: 10px 14px; font-family: var(--font-mono); font-size: 13px; border: 1px solid var(--border); border-radius: var(--radius-sm); outline: none; background: var(--white);">
+                    </div>
+                    <div style="display: flex; background: var(--bg2); padding: 3px; border-radius: var(--radius-sm); border: 1px solid var(--border);">
+                        <button type="button" class="ps-strat-btn active" data-strategy="mobile" style="padding: 8px 16px; border: none; border-radius: 6px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; cursor: pointer; background: var(--white); color: var(--primary); box-shadow: 0 1px 3px rgba(0,0,0,0.1);">📱 Mobile</button>
+                        <button type="button" class="ps-strat-btn" data-strategy="desktop" style="padding: 8px 16px; border: none; border-radius: 6px; font-family: var(--font-mono); font-size: 12px; font-weight: 600; cursor: pointer; background: transparent; color: var(--muted);">🖥️ Desktop</button>
+                    </div>
+                    <button type="button" id="psAnalyzeBtn" style="padding: 10px 22px; font-family: var(--font-mono); font-size: 12px; font-weight: 700; border-radius: var(--radius-sm); border: none; background: linear-gradient(135deg, var(--primary), #0052aa); color: #fff; cursor: pointer; box-shadow: 0 2px 8px rgba(0,102,204,0.25); display: inline-flex; align-items: center; gap: 6px;">
+                        <span>⚡ Analyze</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- ANALYZED URL BANNER -->
+            <div id="psUrlBanner" class="gsc-notice" style="display: none; margin-bottom: 20px; align-items: center; justify-content: space-between;">
+                <div>
+                    <span style="font-weight: 600;">Analyzed URL:</span> 
+                    <a id="psAnalyzedUrlLink" href="https://intoaec.ai/" target="_blank" style="font-family: var(--font-mono); font-weight: 600; color: var(--primary); text-decoration: none;">https://intoaec.ai/</a>
+                    <span id="psFetchedAtTag" style="font-size: 11px; color: var(--muted); margin-left: 10px; font-family: var(--font-mono);"></span>
+                </div>
+                <span id="psCacheBadge" style="font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 12px; background: var(--primary-light); color: var(--primary);">Live Data</span>
+            </div>
+
+            <!-- LOADING STATE -->
+            <div id="psLoading" class="card" style="display: none; padding: 56px 32px; text-align: center; margin-bottom: 24px; box-shadow: var(--shadow);">
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;">
+                    <div style="position: relative; width: 68px; height: 68px; margin-bottom: 20px;">
+                        <div style="position: absolute; inset: 0; border-radius: 50%; border: 3.5px solid #ffedd5; border-top-color: #ea580c; animation: spin 1.2s linear infinite;"></div>
+                        <div style="position: absolute; inset: 6px; border-radius: 50%; background: linear-gradient(135deg, #fff7ed, #ffedd5); display: flex; align-items: center; justify-content: center; font-size: 26px;">⚡</div>
+                    </div>
+                    <h3 style="font-family: var(--font-display); font-size: 18px; font-weight: 600; color: var(--text); margin: 0 0 8px 0; text-align: center;">Analyzing page performance…</h3>
+                    <p style="font-size: 13px; color: var(--muted); line-height: 1.6; max-width: 440px; margin: 0 auto; text-align: center;">
+                        Running Google PageSpeed Insights &amp; Lighthouse audit for mobile and desktop metrics.
+                    </p>
+                    <div style="width: 240px; height: 5px; background: var(--bg2); border-radius: 3px; overflow: hidden; margin-top: 24px; position: relative;">
+                        <div style="position: absolute; top: 0; bottom: 0; background: linear-gradient(90deg, #ea580c, #f97316); border-radius: 3px; animation: psBarProgress 1.8s ease-in-out infinite;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ERROR STATE -->
+            <div id="psError" class="info-box info-box-warn" style="display: none; margin-bottom: 20px; border-color: var(--down); background: var(--down-bg); color: var(--down-text);">
+                <div style="font-weight: 700; margin-bottom: 4px;">⚠️ Performance Analysis Failed</div>
+                <div id="psErrorText">Unable to analyze this URL. Please verify the web address and try again.</div>
+            </div>
+
+            <!-- MAIN RESULTS CONTENT -->
+            <div id="psResults" style="display: none;">
+                <!-- SECTION 1: LIGHTHOUSE SCORES CARD GRID -->
+                <div style="margin-bottom: 24px;">
+                    <h3 style="font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px;">Lighthouse Categories</h3>
+                    <div class="metric-grid" style="grid-template-columns: repeat(4, 1fr);">
+                        
+                        <!-- Performance Gauge Card -->
+                        <div class="card" style="padding: 20px; text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                            <div style="font-size: 11px; font-family: var(--font-mono); font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 8px;">Performance Score</div>
+                            <div id="psPerfGauge" style="width: 84px; height: 84px; border-radius: 50%; border: 6px solid #12b47a; display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-size: 24px; font-weight: 700; color: var(--text); margin: 6px 0;">
+                                <span id="psPerfScoreVal">—</span>
+                            </div>
+                            <div id="psPerfScoreStatus" class="gsc-position-badge gsc-pos-top" style="margin-top: 6px; font-size: 11px;">Good</div>
+                        </div>
+
+                        <!-- Accessibility Card -->
+                        <div class="metric-card c-primary">
+                            <div class="metric-label">Accessibility</div>
+                            <div class="metric-value" id="psAccessScoreVal">—</div>
+                            <div class="metric-footer"><span class="metric-delta delta-up" id="psAccessBadge">Lighthouse</span><span class="metric-bench">out of 100</span></div>
+                        </div>
+
+                        <!-- Best Practices Card -->
+                        <div class="metric-card c-teal">
+                            <div class="metric-label">Best Practices</div>
+                            <div class="metric-value" id="psBpScoreVal">—</div>
+                            <div class="metric-footer"><span class="metric-delta delta-up" id="psBpBadge">Lighthouse</span><span class="metric-bench">out of 100</span></div>
+                        </div>
+
+                        <!-- SEO Card -->
+                        <div class="metric-card c-warn">
+                            <div class="metric-label">SEO Score</div>
+                            <div class="metric-value" id="psSeoScoreVal">—</div>
+                            <div class="metric-footer"><span class="metric-delta delta-up" id="psSeoBadge">Lighthouse</span><span class="metric-bench">out of 100</span></div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- SECTION 2: CORE WEB VITALS (Field & Lab Data) -->
+                <div style="margin-bottom: 24px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                        <h3 style="font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--text);">Core Web Vitals</h3>
+                        <span id="psFieldSourceTag" style="font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--muted); background: var(--bg2); padding: 4px 10px; border-radius: 12px; border: 1px solid var(--border);">Real-User Data (CrUX)</span>
+                    </div>
+
+                    <!-- Notice if Field Data unavailable -->
+                    <div id="psFieldNotice" class="info-box info-box-warn" style="display: none; margin-bottom: 14px; font-size: 12px;">
+                        ℹ️ Real-user data is not available for this URL. Displaying Lighthouse lab simulation metrics below.
+                    </div>
+
+                    <div class="chart-row three-col" style="margin-bottom: 0;">
+                        <!-- LCP Card -->
+                        <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                                    <div>
+                                        <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--primary-text); background: var(--primary-light); padding: 3px 8px; border-radius: 4px;">LCP</span>
+                                        <div style="font-size: 13px; font-weight: 600; color: var(--text); margin-top: 6px;">Largest Contentful Paint</div>
+                                    </div>
+                                    <span id="psLcpBadge" class="metric-delta delta-up" style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px;">✓ Good</span>
+                                </div>
+                                <div id="psLcpVal" style="font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--text); margin-bottom: 16px;">—</div>
+                            </div>
+                            <div id="psLcpDistWrap">
+                                <!-- PageSpeed Insights Pin & Distribution Bar Indicator -->
+                                <div style="position: relative; width: 100%; padding-top: 28px; margin-bottom: 10px;">
+                                    <div id="psLcpPinWrap" style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; transition: left 0.4s ease; z-index: 2;">
+                                        <span id="psLcpPinVal" style="font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: #12b47a; margin-bottom: 2px; white-space: nowrap;">—</span>
+                                        <div style="width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid #5f6368; background: #ffffff; box-shadow: 0 1px 2px rgba(0,0,0,0.15);"></div>
+                                        <div style="width: 1.5px; height: 8px; background: #5f6368;"></div>
+                                    </div>
+                                    <div style="height: 6px; border-radius: 3px; overflow: hidden; display: flex; gap: 2px; background: #eef1f7;">
+                                        <div id="psLcpBarGood" style="background: #12b47a; width: 0%; transition: width 0.4s; border-radius: 3px 0 0 3px;"></div>
+                                        <div id="psLcpBarNi" style="background: #f59e0b; width: 0%; transition: width 0.4s;"></div>
+                                        <div id="psLcpBarPoor" style="background: #e5403c; width: 0%; transition: width 0.4s; border-radius: 0 3px 3px 0;"></div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 11px; font-family: var(--font-mono);">
+                                    <span style="color: #12b47a; font-weight: 600;">Good: <span id="psLcpPctGood">0%</span></span>
+                                    <span style="color: #d97706; font-weight: 600;">Needs Imp: <span id="psLcpPctNi">0%</span></span>
+                                    <span style="color: #e5403c; font-weight: 600;">Poor: <span id="psLcpPctPoor">0%</span></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- INP Card -->
+                        <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                                    <div>
+                                        <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--teal-text); background: var(--teal-light); padding: 3px 8px; border-radius: 4px;">INP</span>
+                                        <div style="font-size: 13px; font-weight: 600; color: var(--text); margin-top: 6px;">Interaction to Next Paint</div>
+                                    </div>
+                                    <span id="psInpBadge" class="metric-delta delta-up" style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px;">✓ Good</span>
+                                </div>
+                                <div id="psInpVal" style="font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--text); margin-bottom: 16px;">—</div>
+                            </div>
+                            <div id="psInpDistWrap">
+                                <!-- PageSpeed Insights Pin & Distribution Bar Indicator -->
+                                <div style="position: relative; width: 100%; padding-top: 28px; margin-bottom: 10px;">
+                                    <div id="psInpPinWrap" style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; transition: left 0.4s ease; z-index: 2;">
+                                        <span id="psInpPinVal" style="font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: #12b47a; margin-bottom: 2px; white-space: nowrap;">—</span>
+                                        <div style="width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid #5f6368; background: #ffffff; box-shadow: 0 1px 2px rgba(0,0,0,0.15);"></div>
+                                        <div style="width: 1.5px; height: 8px; background: #5f6368;"></div>
+                                    </div>
+                                    <div style="height: 6px; border-radius: 3px; overflow: hidden; display: flex; gap: 2px; background: #eef1f7;">
+                                        <div id="psInpBarGood" style="background: #12b47a; width: 0%; transition: width 0.4s; border-radius: 3px 0 0 3px;"></div>
+                                        <div id="psInpBarNi" style="background: #f59e0b; width: 0%; transition: width 0.4s;"></div>
+                                        <div id="psInpBarPoor" style="background: #e5403c; width: 0%; transition: width 0.4s; border-radius: 0 3px 3px 0;"></div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 11px; font-family: var(--font-mono);">
+                                    <span style="color: #12b47a; font-weight: 600;">Good: <span id="psInpPctGood">0%</span></span>
+                                    <span style="color: #d97706; font-weight: 600;">Needs Imp: <span id="psInpPctNi">0%</span></span>
+                                    <span style="color: #e5403c; font-weight: 600;">Poor: <span id="psInpPctPoor">0%</span></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- CLS Card -->
+                        <div class="card" style="padding: 20px; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div>
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+                                    <div>
+                                        <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--warn-text); background: var(--warn-bg); padding: 3px 8px; border-radius: 4px;">CLS</span>
+                                        <div style="font-size: 13px; font-weight: 600; color: var(--text); margin-top: 6px;">Cumulative Layout Shift</div>
+                                    </div>
+                                    <span id="psClsBadge" class="metric-delta delta-up" style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 20px;">✓ Good</span>
+                                </div>
+                                <div id="psClsVal" style="font-family: var(--font-display); font-size: 32px; font-weight: 700; color: var(--text); margin-bottom: 16px;">—</div>
+                            </div>
+                            <div id="psClsDistWrap">
+                                <!-- PageSpeed Insights Pin & Distribution Bar Indicator -->
+                                <div style="position: relative; width: 100%; padding-top: 28px; margin-bottom: 10px;">
+                                    <div id="psClsPinWrap" style="position: absolute; top: 0; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; transition: left 0.4s ease; z-index: 2;">
+                                        <span id="psClsPinVal" style="font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: #12b47a; margin-bottom: 2px; white-space: nowrap;">—</span>
+                                        <div style="width: 7px; height: 7px; border-radius: 50%; border: 1.5px solid #5f6368; background: #ffffff; box-shadow: 0 1px 2px rgba(0,0,0,0.15);"></div>
+                                        <div style="width: 1.5px; height: 8px; background: #5f6368;"></div>
+                                    </div>
+                                    <div style="height: 6px; border-radius: 3px; overflow: hidden; display: flex; gap: 2px; background: #eef1f7;">
+                                        <div id="psClsBarGood" style="background: #12b47a; width: 0%; transition: width 0.4s; border-radius: 3px 0 0 3px;"></div>
+                                        <div id="psClsBarNi" style="background: #f59e0b; width: 0%; transition: width 0.4s;"></div>
+                                        <div id="psClsBarPoor" style="background: #e5403c; width: 0%; transition: width 0.4s; border-radius: 0 3px 3px 0;"></div>
+                                    </div>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 11px; font-family: var(--font-mono);">
+                                    <span style="color: #12b47a; font-weight: 600;">Good: <span id="psClsPctGood">0%</span></span>
+                                    <span style="color: #d97706; font-weight: 600;">Needs Imp: <span id="psClsPctNi">0%</span></span>
+                                    <span style="color: #e5403c; font-weight: 600;">Poor: <span id="psClsPctPoor">0%</span></span>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- SECTION 3: ADDITIONAL PERFORMANCE METRICS -->
+                <div>
+                    <h3 style="font-family: var(--font-display); font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 12px;">Additional Performance Metrics</h3>
+                    <div class="metric-grid" style="grid-template-columns: repeat(4, 1fr);">
+                        
+                        <div class="metric-card c-primary">
+                            <div class="metric-label">First Contentful Paint (FCP)</div>
+                            <div class="metric-value" id="psFcpVal">—</div>
+                            <div class="metric-footer"><span class="metric-delta delta-neutral">Lighthouse Audit</span><span class="metric-bench">target ≤ 1.8s</span></div>
+                        </div>
+
+                        <div class="metric-card c-teal">
+                            <div class="metric-label">Time to First Byte (TTFB)</div>
+                            <div class="metric-value" id="psTtfbVal">—</div>
+                            <div class="metric-footer"><span class="metric-delta delta-neutral">Server Response</span><span class="metric-bench">target ≤ 800ms</span></div>
+                        </div>
+
+                        <div class="metric-card c-warn">
+                            <div class="metric-label">Speed Index</div>
+                            <div class="metric-value" id="psSpeedIndexVal">—</div>
+                            <div class="metric-footer"><span class="metric-delta delta-neutral">Visual Load</span><span class="metric-bench">target ≤ 3.4s</span></div>
+                        </div>
+
+                        <div class="metric-card c-up">
+                            <div class="metric-label">Total Blocking Time (TBT)</div>
+                            <div class="metric-value" id="psTbtVal">—</div>
+                            <div class="metric-footer"><span class="metric-delta delta-neutral">Main Thread</span><span class="metric-bench">target ≤ 200ms</span></div>
+                        </div>
+
                     </div>
                 </div>
             </div>
@@ -4887,8 +5151,253 @@
                     if (!GSC_DATA) {
                         fetchGSC();
                     }
+                } else if (tab.dataset.tab === 'page-performance') {
+                    if (!psLoaded) {
+                        fetchPageSpeedAnalysis(false);
+                    }
                 }
                 window.scrollTo({ top: 0, behavior: 'smooth' });
+            });
+        });
+
+        // ── Page Performance JS Client ──────────────────────────────────────────────────
+        let psActiveStrategy = 'mobile';
+        let psLoaded = false;
+
+        async function fetchPageSpeedAnalysis(forceRefresh = false) {
+            const urlInput = document.getElementById('psUrlInput');
+            const analyzeBtn = document.getElementById('psAnalyzeBtn');
+            const refBtn = document.getElementById('psRefreshBtn');
+            const loadingDiv = document.getElementById('psLoading');
+            const errorDiv = document.getElementById('psError');
+            const errorText = document.getElementById('psErrorText');
+            const resultsDiv = document.getElementById('psResults');
+            const urlBanner = document.getElementById('psUrlBanner');
+
+            const targetUrl = (urlInput ? urlInput.value.trim() : '') || 'https://intoaec.ai/';
+
+            if (loadingDiv) loadingDiv.style.display = 'block';
+            if (errorDiv) errorDiv.style.display = 'none';
+            if (resultsDiv) resultsDiv.style.display = 'none';
+            if (urlBanner) urlBanner.style.display = 'none';
+            if (analyzeBtn) { analyzeBtn.disabled = true; analyzeBtn.textContent = forceRefresh ? 'Refreshing...' : 'Analyzing...'; }
+            if (refBtn) { refBtn.disabled = true; refBtn.textContent = '⏳ Loading...'; }
+
+            try {
+                const res = await fetch('/api/pagespeed/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url: targetUrl, strategy: psActiveStrategy, refresh: forceRefresh })
+                });
+
+                const payload = await res.json();
+                if (!res.ok || !payload.success) {
+                    throw new Error(payload.error || 'Failed to analyze page performance');
+                }
+
+                renderPageSpeedResults(payload);
+                psLoaded = true;
+            } catch (err) {
+                console.error('PageSpeed analysis failed:', err.message);
+                if (errorText) errorText.textContent = err.message || 'Failed to pull PageSpeed Insights data.';
+                if (errorDiv) errorDiv.style.display = 'block';
+            } finally {
+                if (loadingDiv) loadingDiv.style.display = 'none';
+                if (analyzeBtn) { analyzeBtn.disabled = false; analyzeBtn.innerHTML = `<span>⚡ Analyze</span>`; }
+                if (refBtn) { refBtn.disabled = false; refBtn.textContent = '🔄 Refresh Analysis'; }
+            }
+        }
+
+        function renderPageSpeedResults(data) {
+            const resultsDiv = document.getElementById('psResults');
+            const urlBanner = document.getElementById('psUrlBanner');
+            const urlLink = document.getElementById('psAnalyzedUrlLink');
+            const fetchedAtTag = document.getElementById('psFetchedAtTag');
+            const cacheBadge = document.getElementById('psCacheBadge');
+            const stratTag = document.getElementById('psStrategyTag');
+
+            if (resultsDiv) resultsDiv.style.display = 'block';
+            if (urlBanner) urlBanner.style.display = 'flex';
+            if (urlLink) { urlLink.href = data.url; urlLink.textContent = data.url; }
+            if (fetchedAtTag) fetchedAtTag.textContent = `Analyzed: ${new Date(data.fetchedAt || Date.now()).toLocaleTimeString()}`;
+            if (cacheBadge) {
+                cacheBadge.textContent = data.cached ? 'Cached (1h)' : 'Live Data';
+                cacheBadge.style.background = data.cached ? 'var(--neutral-bg)' : 'var(--primary-light)';
+                cacheBadge.style.color = data.cached ? 'var(--neutral)' : 'var(--primary)';
+            }
+            if (stratTag) stratTag.textContent = data.strategy.charAt(0).toUpperCase() + data.strategy.slice(1);
+
+            // Performance Gauge & Category Scores
+            const scores = data.scores || {};
+            const perfVal = scores.performance != null ? scores.performance : '—';
+            const perfValEl = document.getElementById('psPerfScoreVal');
+            if (perfValEl) perfValEl.textContent = perfVal;
+            
+            const perfGauge = document.getElementById('psPerfGauge');
+            const perfStatus = document.getElementById('psPerfScoreStatus');
+            if (perfGauge && perfStatus) {
+                let borderCol = '#12b47a';
+                let statusLabel = `Good (${perfVal}/100)`;
+                let badgeClass = 'gsc-pos-top';
+                if (scores.performance < 50) { borderCol = '#e5403c'; statusLabel = `Poor (${perfVal}/100)`; badgeClass = 'gsc-pos-low'; }
+                else if (scores.performance < 90) { borderCol = '#f59e0b'; statusLabel = `Needs Improvement (${perfVal}/100)`; badgeClass = 'gsc-pos-mid'; }
+                perfGauge.style.borderColor = borderCol;
+                perfStatus.textContent = statusLabel;
+                perfStatus.className = `gsc-position-badge ${badgeClass}`;
+            }
+
+            document.getElementById('psAccessScoreVal').textContent = scores.accessibility != null ? scores.accessibility : '—';
+            document.getElementById('psBpScoreVal').textContent = scores.bestPractices != null ? scores.bestPractices : '—';
+            document.getElementById('psSeoScoreVal').textContent = scores.seo != null ? scores.seo : '—';
+
+            // Field vs Lab Data handling
+            const field = data.fieldData || {};
+            const cwv = data.coreWebVitals || {};
+            const fieldNotice = document.getElementById('psFieldNotice');
+            const fieldTag = document.getElementById('psFieldSourceTag');
+
+            if (field.available) {
+                if (fieldNotice) fieldNotice.style.display = 'none';
+                if (fieldTag) fieldTag.textContent = field.isOriginFallback ? 'Real-User Data (Domain Origin)' : 'Real-User Data (CrUX)';
+            } else {
+                if (fieldNotice) fieldNotice.style.display = 'block';
+                if (fieldTag) fieldTag.textContent = 'Lighthouse Lab Simulation';
+            }
+
+            // Core Web Vitals Renderer
+            const renderCwvMetric = (key, metric, metricType) => {
+                if (!metric) return;
+                const valEl = document.getElementById(`ps${key}Val`);
+                const badgeEl = document.getElementById(`ps${key}Badge`);
+                const barGood = document.getElementById(`ps${key}BarGood`);
+                const barNi = document.getElementById(`ps${key}BarNi`);
+                const barPoor = document.getElementById(`ps${key}BarPoor`);
+                const pctGood = document.getElementById(`ps${key}PctGood`);
+                const pctNi = document.getElementById(`ps${key}PctNi`);
+                const pctPoor = document.getElementById(`ps${key}PctPoor`);
+
+                const pinWrap = document.getElementById(`ps${key}PinWrap`);
+                const pinVal = document.getElementById(`ps${key}PinVal`);
+
+                if (valEl) valEl.textContent = metric.displayValue || '—';
+                
+                let textColor = '#12b47a';
+                let badgeText = '✓ Good';
+                let badgeCls = 'metric-delta delta-up';
+                if (metric.status === 'needs-improvement') {
+                    textColor = '#d97706';
+                    badgeText = '⚠ Needs Imp';
+                    badgeCls = 'metric-delta delta-neutral';
+                } else if (metric.status === 'poor') {
+                    textColor = '#e5403c';
+                    badgeText = '✗ Poor';
+                    badgeCls = 'metric-delta delta-down';
+                }
+
+                if (badgeEl) {
+                    badgeEl.textContent = badgeText;
+                    badgeEl.className = badgeCls;
+                }
+
+                const dists = metric.distributions || { goodPct: 70, needsImpPct: 20, poorPct: 10 };
+                const goodW = dists.goodPct || 0;
+                const niW = dists.needsImpPct || 0;
+                const poorW = dists.poorPct || 0;
+
+                if (barGood) barGood.style.width = `${goodW}%`;
+                if (barNi) barNi.style.width = `${niW}%`;
+                if (barPoor) barPoor.style.width = `${poorW}%`;
+
+                if (pctGood) pctGood.textContent = `${goodW}%`;
+                if (pctNi) pctNi.textContent = `${niW}%`;
+                if (pctPoor) pctPoor.textContent = `${poorW}%`;
+
+                // Calculate Pin Marker position (0% - 100%)
+                if (pinWrap && pinVal) {
+                    pinVal.textContent = metric.displayValue || '—';
+                    pinVal.style.color = textColor;
+
+                    const numVal = metric.value;
+                    let pinPos = 50;
+
+                    if (numVal != null) {
+                        const totalW = (goodW + niW + poorW) || 100;
+                        const gW = (goodW / totalW) * 100;
+                        const nW = (niW / totalW) * 100;
+                        const pW = (poorW / totalW) * 100;
+
+                        if (metricType === 'lcp') {
+                            if (metric.status === 'good') {
+                                pinPos = Math.min(1, numVal / 2.5) * Math.max(15, gW);
+                            } else if (metric.status === 'needs-improvement') {
+                                pinPos = gW + Math.min(1, Math.max(0, (numVal - 2.5) / 1.5)) * nW;
+                            } else {
+                                pinPos = gW + nW + Math.min(1, Math.max(0, (numVal - 4.0) / 4.0)) * pW;
+                            }
+                        } else if (metricType === 'inp') {
+                            if (metric.status === 'good') {
+                                pinPos = Math.min(1, numVal / 200) * Math.max(15, gW);
+                            } else if (metric.status === 'needs-improvement') {
+                                pinPos = gW + Math.min(1, Math.max(0, (numVal - 200) / 300)) * nW;
+                            } else {
+                                pinPos = gW + nW + Math.min(1, Math.max(0, (numVal - 500) / 500)) * pW;
+                            }
+                        } else if (metricType === 'cls') {
+                            if (metric.status === 'good') {
+                                pinPos = Math.min(1, numVal / 0.10) * Math.max(15, gW);
+                            } else if (metric.status === 'needs-improvement') {
+                                pinPos = gW + Math.min(1, Math.max(0, (numVal - 0.10) / 0.15)) * nW;
+                            } else {
+                                pinPos = gW + nW + Math.min(1, Math.max(0, (numVal - 0.25) / 0.25)) * pW;
+                            }
+                        }
+                    }
+
+                    // Clamp position between 4% and 96%
+                    const clampedPos = Math.max(4, Math.min(96, pinPos));
+                    pinWrap.style.left = `${clampedPos}%`;
+                }
+            };
+
+            renderCwvMetric('Lcp', cwv.lcp, 'lcp');
+            renderCwvMetric('Inp', cwv.inp, 'inp');
+            renderCwvMetric('Cls', cwv.cls, 'cls');
+
+            // Additional Performance Metrics
+            const metrics = data.metrics || {};
+            document.getElementById('psFcpVal').textContent = metrics.fcp || '—';
+            document.getElementById('psTtfbVal').textContent = metrics.ttfb || '—';
+            document.getElementById('psSpeedIndexVal').textContent = metrics.speedIndex || '—';
+            document.getElementById('psTbtVal').textContent = metrics.tbt || '—';
+        }
+
+        // Attach listeners for Page Performance controls
+        const psAnalyzeBtn = document.getElementById('psAnalyzeBtn');
+        if (psAnalyzeBtn) psAnalyzeBtn.addEventListener('click', () => fetchPageSpeedAnalysis(false));
+
+        const psRefreshBtn = document.getElementById('psRefreshBtn');
+        if (psRefreshBtn) psRefreshBtn.addEventListener('click', () => fetchPageSpeedAnalysis(true));
+
+        const psUrlInput = document.getElementById('psUrlInput');
+        if (psUrlInput) psUrlInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') fetchPageSpeedAnalysis(false);
+        });
+
+        document.querySelectorAll('.ps-strat-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.ps-strat-btn').forEach(b => {
+                    b.classList.remove('active');
+                    b.style.background = 'transparent';
+                    b.style.color = 'var(--muted)';
+                    b.style.boxShadow = 'none';
+                });
+                btn.classList.add('active');
+                btn.style.background = 'var(--white)';
+                btn.style.color = 'var(--primary)';
+                btn.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+
+                psActiveStrategy = btn.dataset.strategy;
+                fetchPageSpeedAnalysis(false);
             });
         });
 

@@ -9,6 +9,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { runAnalytics, runGA4Countries, getGA4DimensionValues, getFilteredGA4Data } from './analysis.js';
 import { runGSC, listSites, runIndexingStatus, getIndexingData, inspectSingleUrl, inspectSingleUrlWithCache, isUrlInProperty, mapUrlInspectionError, fetchCoreWebVitals } from './gsc.js';
+import { analyzePageSpeed } from './pagespeed.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -327,6 +328,38 @@ app.get('/api/core-web-vitals', async (req, res) => {
     } catch (err) {
         console.error('Core Web Vitals fetch failed:', err.message);
         return res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// POST /api/pagespeed/analyze
+// Runs Google PageSpeed Insights & Web Vitals analysis
+app.post('/api/pagespeed/analyze', async (req, res) => {
+    const { url, strategy, refresh } = req.body || {};
+    const forceRefresh = refresh === true || req.body?.forceRefresh === true;
+
+    try {
+        const result = await analyzePageSpeed(url, strategy, forceRefresh);
+        return res.json(result);
+    } catch (err) {
+        console.error('PageSpeed analysis failed:', err.message);
+        const statusCode = err.message.includes('Invalid URL') ? 400 : 500;
+        return res.status(statusCode).json({ success: false, error: err.message });
+    }
+});
+
+// GET /api/pagespeed/analyze
+app.get('/api/pagespeed/analyze', async (req, res) => {
+    const url = req.query.url ? decodeURIComponent(req.query.url) : null;
+    const strategy = req.query.strategy || req.query.device || 'mobile';
+    const forceRefresh = req.query.refresh === 'true';
+
+    try {
+        const result = await analyzePageSpeed(url, strategy, forceRefresh);
+        return res.json(result);
+    } catch (err) {
+        console.error('PageSpeed analysis GET failed:', err.message);
+        const statusCode = err.message.includes('Invalid URL') ? 400 : 500;
+        return res.status(statusCode).json({ success: false, error: err.message });
     }
 });
 
