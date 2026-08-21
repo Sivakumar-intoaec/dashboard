@@ -186,7 +186,7 @@ function processFbPosts(rawPosts) {
       longitude: loc.longitude || null,
       mediaViews: ins.impressions || 0,
       engagement: likes + comments + shares,
-      engagementRate: ins.reach > 0 ? +((( likes + comments + shares) / ins.reach) * 100).toFixed(2) : 0
+      engagementRate: ins.reach > 0 ? +(((likes + comments + shares) / ins.reach) * 100).toFixed(2) : 0
     };
   });
 }
@@ -287,7 +287,7 @@ function processIgMedia(rawMedia) {
       plays: ins.plays || 0,
       replies: ins.replies || 0,
       engagement,
-      engagementRate: ins.reach > 0 ? +(( engagement / ins.reach) * 100).toFixed(2) : 0
+      engagementRate: ins.reach > 0 ? +((engagement / ins.reach) * 100).toFixed(2) : 0
     };
   });
 }
@@ -344,6 +344,23 @@ async function getGA4TopPages(startDate = '365daysAgo', endDate = 'today') {
     });
     return res.data.rows || [];
   } catch (err) { console.error('❌ GA4 pages:', err.message); return []; }
+}
+
+async function getGA4TopCountries(startDate = '2020-01-01', endDate = 'today') {
+  if (!analyticsData) return [];
+  try {
+    const res = await analyticsData.properties.runReport({
+      property: `properties/${NORMALIZED_GA_PROPERTY_ID}`,
+      requestBody: {
+        dateRanges: [{ startDate, endDate }],
+        dimensions: [{ name: 'country' }],
+        metrics: [{ name: 'screenPageViews' }],
+        orderBys: [{ metric: { metricName: 'screenPageViews' }, desc: true }],
+        limit: 15
+      }
+    });
+    return res.data.rows || [];
+  } catch (err) { console.error('❌ GA4 countries:', err.message); return []; }
 }
 
 // ─── LinkedIn via GA4 ────────────────────────────────────────────────────────
@@ -694,6 +711,23 @@ function shapeDashboardPayload({ fbData, igData, gaData, ytData, liData = null, 
 }
 
 // ─── Main export ─────────────────────────────────────────────────────────────
+/**
+ * Fetches the top 15 countries by page views (all-time) from the GA4 property.
+ * Reuses the same OAuth client and property ID as runAnalytics().
+ * Returns an array of { country, views } objects, sorted descending by views.
+ */
+export async function runGA4Countries() {
+  initGoogle();
+  if (!analyticsData || !NORMALIZED_GA_PROPERTY_ID) {
+    throw new Error('GA4 not configured — check GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET, GOOGLE_REFRESH_TOKEN, and GA_PROPERTY_ID in .env');
+  }
+  const rows = await getGA4TopCountries();
+  return rows.map(r => ({
+    country: r.dimensionValues[0].value,
+    views: +r.metricValues[0].value
+  }));
+}
+
 export async function runAnalytics() {
   initGoogle();
 
@@ -708,38 +742,38 @@ export async function runAnalytics() {
     // ─── Facebook ───
     fbEnabled
       ? (async () => {
-          console.log('\n─── Facebook ───');
-          await getPageToken();
-          const [pageInfo, pageInsights] = await Promise.all([
-            fetchFbPageInfo(),
-            fetchFbPageInsights()
-          ]);
-          const rawPosts = await fetchFbAllPosts();
-          const posts = processFbPosts(rawPosts);
-          const totalLikes = posts.reduce((s, p) => s + p.likes, 0);
-          const totalComments = posts.reduce((s, p) => s + p.comments, 0);
-          const totalShares = posts.reduce((s, p) => s + p.shares, 0);
-          return { pageInfo, kpis: { totalPosts: posts.length, totalLikes, totalComments, totalShares, ...pageInsights, avgEngagementRate: 0 }, posts };
-        })()
-          .catch(err => { warnings.push(`FB: ${err.message}`); console.error('⚠️  FB skipped:', err.message); return null; })
+        console.log('\n─── Facebook ───');
+        await getPageToken();
+        const [pageInfo, pageInsights] = await Promise.all([
+          fetchFbPageInfo(),
+          fetchFbPageInsights()
+        ]);
+        const rawPosts = await fetchFbAllPosts();
+        const posts = processFbPosts(rawPosts);
+        const totalLikes = posts.reduce((s, p) => s + p.likes, 0);
+        const totalComments = posts.reduce((s, p) => s + p.comments, 0);
+        const totalShares = posts.reduce((s, p) => s + p.shares, 0);
+        return { pageInfo, kpis: { totalPosts: posts.length, totalLikes, totalComments, totalShares, ...pageInsights, avgEngagementRate: 0 }, posts };
+      })()
+        .catch(err => { warnings.push(`FB: ${err.message}`); console.error('⚠️  FB skipped:', err.message); return null; })
       : Promise.resolve(null).then(() => { warnings.push('FB skipped: PAGE_ID or ACCESS_TOKEN missing'); return null; }),
 
     // ─── Instagram ───
     igEnabled
       ? (async () => {
-          console.log('\n─── Instagram ───');
-          const [accountInfo, accountInsights, audience, rawMedia] = await Promise.all([
-            fetchIgAccountInfo(),
-            fetchIgAccountInsights(),
-            fetchIgAudienceInsights(),
-            fetchIgAllMedia()
-          ]);
-          const posts = processIgMedia(rawMedia);
-          const totalLikes = posts.reduce((s, p) => s + p.likes, 0);
-          const totalComments = posts.reduce((s, p) => s + p.comments, 0);
-          return { accountInfo, kpis: { totalPosts: posts.length, totalLikes, totalComments, ...accountInsights, avgEngagementRate: 0 }, posts, audience };
-        })()
-          .catch(err => { warnings.push(`IG: ${err.message}`); console.error('⚠️  IG skipped:', err.message); return null; })
+        console.log('\n─── Instagram ───');
+        const [accountInfo, accountInsights, audience, rawMedia] = await Promise.all([
+          fetchIgAccountInfo(),
+          fetchIgAccountInsights(),
+          fetchIgAudienceInsights(),
+          fetchIgAllMedia()
+        ]);
+        const posts = processIgMedia(rawMedia);
+        const totalLikes = posts.reduce((s, p) => s + p.likes, 0);
+        const totalComments = posts.reduce((s, p) => s + p.comments, 0);
+        return { accountInfo, kpis: { totalPosts: posts.length, totalLikes, totalComments, ...accountInsights, avgEngagementRate: 0 }, posts, audience };
+      })()
+        .catch(err => { warnings.push(`IG: ${err.message}`); console.error('⚠️  IG skipped:', err.message); return null; })
       : Promise.resolve(null).then(() => { warnings.push('IG skipped: IG_USER_ID or ACCESS_TOKEN missing'); return null; })
   ]);
 

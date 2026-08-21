@@ -1,0 +1,1312 @@
+# Implement a Separate Google Search Console Indexing Module for All Pages
+
+I already have a working Google Search Console integration in my website.
+
+The existing implementation is documented in `gsc_documentation.md`.
+
+## VERY IMPORTANT
+
+**Do NOT modify, remove, rename, or change the behavior of the existing "Top 15 Landing Pages" module.**
+
+The existing Top 15 Landing Pages functionality must continue working exactly as it does today.
+
+The new requirement is to create a **completely separate "Indexing" module** that checks the indexing status of the website's pages independently of the existing Top 15 Landing Pages.
+
+---
+
+# 1. Existing GSC Integration
+
+The project already has:
+
+- Express backend
+- `server.js`
+- `gsc.js`
+- Google OAuth2 authentication
+- `GOOGLE_CLIENT_ID`
+- `GOOGLE_CLIENT_SECRET`
+- `GOOGLE_REFRESH_TOKEN`
+- `GSC_SITE_URL`
+- Search Console API integration
+- Existing `/api/gsc`
+- Existing `/api/gsc/sites`
+- Existing in-memory caching
+
+The existing architecture is:
+
+```text
+Frontend
+   ↓
+GET /api/gsc
+   ↓
+server.js
+   ↓
+gsc.js
+   ↓
+Google OAuth2
+   ↓
+Google Search Console API
+```
+
+Reuse this existing authentication implementation.
+
+Do NOT create another OAuth flow.
+
+Do NOT create another Google Client ID.
+
+Do NOT create another refresh token.
+
+Do NOT expose Google credentials to the frontend.
+
+The existing documentation confirms that Google credentials and OAuth access tokens are kept server-side. Preserve this architecture.
+
+---
+
+# 2. Existing Top 15 Landing Pages MUST NOT CHANGE
+
+The current implementation contains:
+
+```javascript
+fetchTopPages(sc, siteUrl, startDate, endDate, limit = 15)
+```
+
+This currently returns the top 15 landing pages based on Search Console performance data.
+
+DO NOT:
+
+- change the limit from 15
+- change its query
+- change its response structure
+- add indexing API calls inside `fetchTopPages()`
+- make `/api/gsc` dependent on indexing
+- slow down the existing `/api/gsc` endpoint
+- replace the existing Top 15 Pages implementation
+
+The existing response should continue returning:
+
+```javascript
+topPages: [
+    {
+        rank,
+        page,
+        clicks,
+        impressions,
+        ctr,
+        position
+    }
+]
+```
+
+The existing Top 15 Landing Pages UI must remain unchanged.
+
+---
+
+# 3. New Requirement
+
+Create a completely separate module:
+
+```text
+Search Console
+│
+├── Performance
+├── Top 15 Landing Pages       ← EXISTING, DO NOT TOUCH
+├── Countries
+├── Queries
+│
+└── Indexing                   ← NEW
+      ├── All Pages
+      ├── Indexed
+      ├── Not Indexed
+      └── URL Inspection
+```
+
+The new Indexing module must work independently from `topPages`.
+
+---
+
+# 4. Main Goal
+
+The new Indexing module should discover the website's page URLs independently and check their Google indexing status.
+
+Do NOT use the Top 15 Landing Pages as the URL source.
+
+Instead:
+
+```text
+Website Sitemap(s)
+       ↓
+Get all page URLs
+       ↓
+Remove duplicates
+       ↓
+Validate URLs
+       ↓
+Google URL Inspection API
+       ↓
+Store/cache inspection results
+       ↓
+Indexing Dashboard
+```
+
+---
+
+# 5. URL Source
+
+Use the website's sitemap as the primary URL source.
+
+First determine whether the website has:
+
+```text
+/sitemap.xml
+```
+
+or another sitemap configured in the existing project.
+
+Support:
+
+### Normal sitemap
+
+```text
+https://example.com/sitemap.xml
+```
+
+### Sitemap index
+
+```xml
+<sitemapindex>
+    <sitemap>
+        https://example.com/page-sitemap.xml
+    </sitemap>
+
+    <sitemap>
+        https://example.com/post-sitemap.xml
+    </sitemap>
+</sitemapindex>
+```
+
+The implementation must recursively process sitemap indexes.
+
+Collect all page URLs from the sitemap files.
+
+---
+
+# 6. Do NOT Use Search Analytics to Discover All Pages
+
+Do NOT use:
+
+```javascript
+fetchTopPages()
+```
+
+to obtain the URLs for indexing.
+
+Do NOT assume Search Analytics contains every website page.
+
+The new indexing URL collection must be independent.
+
+Use:
+
+```text
+Sitemap URLs
+```
+
+as the primary source.
+
+---
+
+# 7. URL Deduplication
+
+Before sending URLs to Google's URL Inspection API:
+
+1. Normalize URLs.
+2. Remove duplicate URLs.
+3. Remove invalid URLs.
+4. Ensure URLs belong to the configured Search Console property.
+5. Preserve query parameters only when they represent legitimate indexed URLs.
+6. Avoid inspecting external URLs.
+
+Example:
+
+```text
+https://example.com/about
+https://example.com/about/
+```
+
+Handle URL normalization consistently according to the existing website's URL conventions.
+
+---
+
+# 8. URL Inspection API
+
+Use Google's official URL Inspection API.
+
+The API endpoint is:
+
+```text
+POST https://searchconsole.googleapis.com/v1/urlInspection/index:inspect
+```
+
+with a request containing:
+
+```json
+{
+    "inspectionUrl": "https://example.com/about",
+    "siteUrl": "sc-domain:example.com",
+    "languageCode": "en-US"
+}
+```
+
+The `inspectionUrl` must belong to the Search Console property specified by `siteUrl`.
+
+Use the existing OAuth access token generated by the current `buildOAuthClient()` implementation.
+
+Do not implement a separate authentication system.
+
+Google's URL Inspection API provides URL-level index information including the indexed URL's verdict and coverage/indexing details.
+
+---
+
+# 9. Create a Separate GSC Indexing Service
+
+Extend `gsc.js` or create a small dedicated GSC indexing service, following the project's existing architecture.
+
+Prefer functions such as:
+
+```javascript
+getSitemapUrls()
+inspectUrl()
+inspectUrls()
+getIndexingSummary()
+```
+
+Example:
+
+```javascript
+async function inspectUrl(sc, siteUrl, inspectionUrl)
+```
+
+Return normalized data:
+
+```javascript
+{
+    url: "https://example.com/about",
+    status: "INDEXED",
+    verdict: "PASS",
+    coverageState: "Indexed",
+    indexingState: "INDEXING_ALLOWED",
+    robotsTxtState: "ALLOWED",
+    pageFetchState: "SUCCESSFUL",
+    lastCrawlTime: "2026-08-17T10:30:00Z",
+    googleCanonical: "https://example.com/about",
+    userCanonical: "https://example.com/about"
+}
+```
+
+If Google does not return a particular field, return `null`.
+
+Never fabricate indexing information.
+
+---
+
+# 10. Determine Indexed vs Not Indexed
+
+Create a clear application-level status.
+
+For example:
+
+```text
+INDEXED
+NOT_INDEXED
+INSPECTION_ERROR
+UNKNOWN
+```
+
+Do not determine indexing based only on:
+
+```text
+robotsTxtState
+indexingState
+pageFetchState
+```
+
+Instead, use the appropriate Google URL Inspection index status/verdict and `coverageState` returned by the API.
+
+Example:
+
+```text
+verdict = PASS
+coverageState = Indexed
+```
+
+should display:
+
+```text
+✓ Indexed
+```
+
+If Google returns a non-indexed coverage state, display:
+
+```text
+✗ Not Indexed
+```
+
+and preserve the actual `coverageState` as the reason.
+
+Google's URL Inspection response can contain values such as `Indexed, not submitted in sitemap`, along with indexing and crawl information.
+
+---
+
+# 11. Preserve the Actual Google Reason
+
+This is very important.
+
+For non-indexed pages, do NOT simply display:
+
+```text
+Not Indexed
+```
+
+Display the actual reason returned by Google's inspection result when available.
+
+Examples:
+
+```text
+Not found (404)
+
+Crawled - currently not indexed
+
+Discovered - currently not indexed
+
+Excluded by 'noindex' tag
+
+Page with redirect
+
+Duplicate, Google chose different canonical
+```
+
+Do not hard-code these reasons as if they came from Google.
+
+Use the actual `coverageState` returned for the inspected URL.
+
+If the API does not provide a reason, show:
+
+```text
+Reason unavailable
+```
+
+---
+
+# 12. Create a Separate Backend Endpoint
+
+Create:
+
+```text
+GET /api/gsc/indexing
+```
+
+Do NOT modify the existing `/api/gsc` response.
+
+The new endpoint should support:
+
+```text
+siteUrl
+page
+pageSize
+status
+refresh
+```
+
+Example:
+
+```text
+GET /api/gsc/indexing
+```
+
+Example:
+
+```text
+GET /api/gsc/indexing?page=1&pageSize=25
+```
+
+Example:
+
+```text
+GET /api/gsc/indexing?status=NOT_INDEXED
+```
+
+Example:
+
+```text
+GET /api/gsc/indexing?refresh=true
+```
+
+---
+
+# 13. Recommended Response
+
+Return:
+
+```json
+{
+    "success": true,
+    "data": {
+        "siteUrl": "sc-domain:example.com",
+        "summary": {
+            "totalPages": 1250,
+            "indexed": 980,
+            "notIndexed": 270,
+            "inspectionErrors": 0
+        },
+        "pages": [
+            {
+                "url": "https://example.com/about",
+                "status": "INDEXED",
+                "reason": "Indexed",
+                "verdict": "PASS",
+                "coverageState": "Indexed",
+                "indexingState": "INDEXING_ALLOWED",
+                "robotsTxtState": "ALLOWED",
+                "pageFetchState": "SUCCESSFUL",
+                "lastCrawlTime": "2026-08-17T10:30:00Z",
+                "googleCanonical": "https://example.com/about",
+                "userCanonical": "https://example.com/about"
+            },
+            {
+                "url": "https://example.com/old-page",
+                "status": "NOT_INDEXED",
+                "reason": "Not found (404)",
+                "verdict": "FAIL",
+                "coverageState": "Not found (404)",
+                "lastCrawlTime": "2026-08-15T08:20:00Z"
+            }
+        ]
+    }
+}
+```
+
+---
+
+# 14. Pagination
+
+Do not send thousands of URLs to the frontend in one response.
+
+Implement server-side pagination.
+
+Example:
+
+```text
+GET /api/gsc/indexing?page=1&pageSize=25
+```
+
+Response:
+
+```json
+{
+    "page": 1,
+    "pageSize": 25,
+    "totalPages": 1250,
+    "totalPagesAvailable": 50
+}
+```
+
+The frontend should support:
+
+```text
+Previous
+1
+2
+3
+...
+Next
+```
+
+Also support:
+
+```text
+Rows per page:
+10
+25
+50
+100
+```
+
+---
+
+# 15. Indexing Dashboard UI
+
+Create a new page:
+
+```text
+Search Console → Indexing
+```
+
+At the top show summary cards:
+
+```text
+┌──────────────────┐
+│ Total Pages      │
+│     1,250        │
+└──────────────────┘
+
+┌──────────────────┐
+│ Indexed          │
+│       980        │
+└──────────────────┘
+
+┌──────────────────┐
+│ Not Indexed      │
+│       270        │
+└──────────────────┘
+
+┌──────────────────┐
+│ Inspection Error │
+│         0        │
+└──────────────────┘
+```
+
+These counts must be calculated from actual inspection results stored by the application.
+
+Do not invent or hard-code numbers.
+
+---
+
+# 16. Pages Table
+
+Create:
+
+```text
+All Pages
+
+Search:
+[ Search URL........................ ]
+
+Status:
+[ All ▼ ]
+
+[ Refresh Indexing ]
+```
+
+Table:
+
+| URL | Status | Reason | Last Crawl |
+|---|---|---|---|
+| `/about` | ✓ Indexed | Indexed | Aug 17, 2026 |
+| `/products` | ✓ Indexed | Indexed | Aug 16, 2026 |
+| `/old-page` | ✗ Not Indexed | Not found (404) | Aug 15, 2026 |
+| `/test` | ✗ Not Indexed | Excluded by `noindex` tag | Aug 14, 2026 |
+
+---
+
+# 17. Status Filter
+
+Provide:
+
+```text
+All
+Indexed
+Not Indexed
+Inspection Error
+```
+
+When:
+
+```text
+Not Indexed
+```
+
+is selected, show only URLs whose actual inspection status is `NOT_INDEXED`.
+
+---
+
+# 18. Search
+
+Allow searching by URL.
+
+Example:
+
+```text
+Search:
+[ https://example.com/products ]
+```
+
+The result should show the matching URL and its current cached inspection information.
+
+Do not perform a new Google API inspection for every keystroke.
+
+---
+
+# 19. URL Details
+
+When the user clicks a URL, open a details panel/modal.
+
+Show:
+
+```text
+URL Inspection
+
+URL
+https://example.com/products
+
+Indexing Status
+✓ Indexed
+
+Coverage
+Indexed
+
+Indexing State
+INDEXING_ALLOWED
+
+Robots.txt
+ALLOWED
+
+Page Fetch
+SUCCESSFUL
+
+Last Crawl
+Aug 17, 2026
+
+Google Canonical
+https://example.com/products
+
+User Canonical
+https://example.com/products
+```
+
+For a non-indexed page:
+
+```text
+URL Inspection
+
+URL
+https://example.com/old-page
+
+Indexing Status
+✗ Not Indexed
+
+Reason
+Not found (404)
+
+Last Crawl
+Aug 15, 2026
+```
+
+Show only fields that exist in the API response.
+
+---
+
+# 20. URL Inspection Cache
+
+This is mandatory.
+
+Do NOT call Google's URL Inspection API every time the Indexing page is opened.
+
+Create an indexing cache/database structure.
+
+If the project already has a database, use the existing database technology and conventions.
+
+Suggested model:
+
+```text
+gsc_url_inspections
+
+id
+site_url
+url
+status
+verdict
+coverage_state
+indexing_state
+robots_txt_state
+page_fetch_state
+last_crawl_time
+google_canonical
+user_canonical
+inspection_result_json
+inspected_at
+created_at
+updated_at
+```
+
+Use:
+
+```text
+site_url + url
+```
+
+as a unique combination.
+
+---
+
+# 21. Cache Behavior
+
+When the Indexing page is opened:
+
+```text
+Get sitemap URLs
+      ↓
+For each URL
+      ↓
+Check stored inspection result
+      ↓
+Recent result?
+   ├── YES → use cached result
+   └── NO  → queue URL for inspection
+```
+
+Do not inspect every URL again.
+
+Make the cache duration configurable.
+
+Example:
+
+```text
+INDEXING_CACHE_TTL_MINUTES=60
+```
+
+If the project does not use a database, use the existing server cache architecture initially, but prefer persistent storage if the project already has a database.
+
+---
+
+# 22. Refresh Indexing
+
+Add:
+
+```text
+[ Refresh Indexing ]
+```
+
+This should NOT blindly inspect every URL immediately.
+
+Instead:
+
+1. Identify URLs whose cache is expired.
+2. Queue them for inspection.
+3. Process them with controlled concurrency.
+4. Store results.
+5. Update the dashboard.
+
+Also provide an individual:
+
+```text
+[ Inspect URL ]
+```
+
+button for a specific URL.
+
+---
+
+# 23. Google API Quota Protection
+
+Google's URL Inspection API currently has an index inspection quota of **2,000 queries per day per Search Console property and 600 queries per minute per property**.
+
+Therefore, if the sitemap contains:
+
+```text
+10,000 pages
+```
+
+DO NOT attempt to inspect all 10,000 pages in a single dashboard request.
+
+Implement an incremental inspection strategy.
+
+Example:
+
+```text
+Day 1
+URL 1 - 2000
+      ↓
+Store results
+
+Day 2
+Next 2000 URLs
+      ↓
+Store results
+
+...
+```
+
+Also prioritize URLs whose cached inspection result is:
+
+```text
+Never inspected
+```
+
+or:
+
+```text
+Cache expired
+```
+
+---
+
+# 24. Controlled Concurrency
+
+Do not execute:
+
+```javascript
+Promise.all(allUrls.map(inspectUrl))
+```
+
+for thousands of URLs.
+
+Instead use controlled batches/concurrency.
+
+Example:
+
+```text
+Concurrency = 5
+```
+
+Process:
+
+```text
+URL 1 ─┐
+URL 2 ─┤
+URL 3 ─┼── Batch
+URL 4 ─┤
+URL 5 ─┘
+```
+
+Then continue with the next batch.
+
+Make concurrency configurable.
+
+---
+
+# 25. Background Processing
+
+If the project architecture allows it, indexing inspection should preferably run independently from the normal page request.
+
+The user should not have to wait for 100 or 1,000 Google API requests to finish.
+
+Preferred flow:
+
+```text
+User opens Indexing
+        ↓
+Show cached results immediately
+        ↓
+Show inspection progress
+        ↓
+Background inspection runs
+        ↓
+Results are stored
+        ↓
+UI refreshes/polls for updated results
+```
+
+Example UI:
+
+```text
+Indexing scan
+
+1,250 URLs found
+980 inspected
+270 pending
+
+[ Refresh ]
+```
+
+If background jobs are not currently available in the project, implement a safe incremental API-based approach first without blocking the entire request.
+
+---
+
+# 26. Inspection Progress
+
+Display progress when a scan is running:
+
+```text
+Indexing Scan
+
+URLs found:       1,250
+Inspected:          450
+Pending:            800
+Indexed:             370
+Not Indexed:          80
+
+Progress: 36%
+```
+
+Do not claim that all URLs are fully checked until all required URLs have actually been inspected.
+
+---
+
+# 27. Sitemap Changes
+
+The website's sitemap can change.
+
+Therefore, every indexing synchronization should:
+
+1. Fetch the current sitemap.
+2. Compare URLs against stored URLs.
+3. Add newly discovered URLs.
+4. Mark removed URLs appropriately.
+5. Avoid deleting historical inspection information unnecessarily.
+
+Example:
+
+```text
+New URL:
+https://example.com/new-page
+```
+
+should be added as:
+
+```text
+status = PENDING
+```
+
+until Google inspection is performed.
+
+---
+
+# 28. URL Inspection Errors
+
+If one URL fails:
+
+```text
+https://example.com/problem
+```
+
+do NOT fail the entire indexing scan.
+
+Store:
+
+```json
+{
+    "status": "INSPECTION_ERROR",
+    "errorMessage": "Unable to inspect URL"
+}
+```
+
+and continue with the other URLs.
+
+Handle:
+
+```text
+401
+403
+404
+429
+5xx
+network errors
+invalid URL
+property mismatch
+```
+
+appropriately.
+
+---
+
+# 29. Important Property Validation
+
+Before inspecting a URL, verify that it belongs to:
+
+```text
+GSC_SITE_URL
+```
+
+The URL Inspection API requires the inspected URL to belong to the Search Console property specified in `siteUrl`.
+
+For example:
+
+```text
+siteUrl:
+sc-domain:example.com
+
+inspectionUrl:
+https://example.com/about
+```
+
+must belong to that property.
+
+Do not inspect external URLs.
+
+---
+
+# 30. Security
+
+Never return:
+
+```text
+GOOGLE_CLIENT_SECRET
+GOOGLE_REFRESH_TOKEN
+OAuth access token
+```
+
+to the frontend.
+
+All Google API calls must happen on the backend.
+
+The frontend should only receive normalized indexing data.
+
+---
+
+# 31. Do Not Reproduce Google's Search Console UI Exactly
+
+The goal is to create our own Indexing dashboard.
+
+Do not scrape or copy the Google Search Console website.
+
+Do not use private Google endpoints.
+
+Use only the official URL Inspection API.
+
+The URL Inspection API provides information about the indexed version of a URL; it does not provide a direct API for reproducing the complete "Pages → Why pages aren't indexed" aggregate report.
+
+Therefore, our dashboard should clearly represent this as:
+
+```text
+Our Indexing Dashboard
+```
+
+based on:
+
+```text
+Sitemap URLs
++
+URL Inspection API results
+```
+
+---
+
+# 32. Important Difference From the Existing Top 15 Pages
+
+The final architecture must be:
+
+```text
+                Search Console
+                     │
+       ┌─────────────┴─────────────┐
+       │                           │
+Top 15 Landing Pages           Indexing
+       │                           │
+Search Analytics API          Sitemap URLs
+       │                           │
+Top 15 only                   All sitemap pages
+       │                           │
+Existing UI                   URL Inspection API
+       │                           │
+DO NOT MODIFY                 New module
+```
+
+This separation is mandatory.
+
+---
+
+# 33. Files to Inspect Before Implementation
+
+Before writing code, inspect:
+
+```text
+gsc.js
+server.js
+existing frontend routing
+existing Search Console dashboard
+existing Top 15 Landing Pages component
+existing API service layer
+existing cache implementation
+existing database/ORM
+existing environment configuration
+```
+
+Understand the current architecture before making changes.
+
+Do not duplicate functionality that already exists.
+
+---
+
+# 34. Expected Files / Components
+
+Use the project's existing structure and naming conventions.
+
+Conceptually, the implementation may contain:
+
+```text
+gsc.js
+    ↓
+indexing helper functions
+
+server.js
+    ↓
+GET /api/gsc/indexing
+
+Frontend
+    ↓
+Search Console → Indexing
+
+Indexing page
+    ↓
+Indexing summary
+    ↓
+All pages table
+    ↓
+Filters
+    ↓
+URL inspection details
+```
+
+Do not blindly create these exact files if the existing project uses a different architecture. Follow the existing structure.
+
+---
+
+# 35. Testing Requirements
+
+Test the following:
+
+### Test 1 — Existing Top 15 Pages
+
+Verify that the existing Top 15 Landing Pages still displays exactly as before.
+
+### Test 2 — Sitemap
+
+Verify that all URLs from the sitemap are discovered.
+
+### Test 3 — Sitemap Index
+
+Verify that nested sitemap files are processed.
+
+### Test 4 — Indexed URL
+
+Verify:
+
+```text
+Status: Indexed
+```
+
+### Test 5 — Non-indexed URL
+
+Verify:
+
+```text
+Status: Not Indexed
+Reason: <actual Google coverage state>
+```
+
+### Test 6 — Search
+
+Search for a URL and verify the correct inspection result is displayed.
+
+### Test 7 — Filter
+
+Verify:
+
+```text
+All
+Indexed
+Not Indexed
+Inspection Error
+```
+
+### Test 8 — Pagination
+
+Verify that large URL sets do not load everything into the browser at once.
+
+### Test 9 — Cache
+
+Open the Indexing module twice and verify that cached inspection results are reused.
+
+### Test 10 — Refresh
+
+Verify that expired/stale URLs are re-inspected.
+
+### Test 11 — API quota
+
+Verify that the application does not issue uncontrolled URL Inspection API requests.
+
+### Test 12 — Existing GSC
+
+Verify that:
+
+```text
+/api/gsc
+/api/gsc/sites
+Top 15 Landing Pages
+Country data
+Query data
+Device data
+Daily performance
+```
+
+continue working exactly as before.
+
+---
+
+# 36. Final Expected UI
+
+The final Search Console navigation should look like:
+
+```text
+Search Console
+│
+├── Performance
+├── Top 15 Landing Pages
+├── Countries
+├── Queries
+└── Indexing
+```
+
+When the user opens:
+
+```text
+Indexing
+```
+
+show:
+
+```text
+┌─────────────────────────────────────────────────────┐
+│ Google Search Console - Indexing                    │
+│                                                     │
+│ Total Pages     Indexed     Not Indexed    Errors  │
+│    1,250          980          270            0     │
+│                                                     │
+│ Search: [________________________]                  │
+│ Status: [All ▼]          [Refresh Indexing]        │
+├─────────────────────────────────────────────────────┤
+│ URL                    Status       Reason           │
+├─────────────────────────────────────────────────────┤
+│ /about                 ✓ Indexed    Indexed          │
+│ /products              ✓ Indexed    Indexed          │
+│ /old-page              ✗ Not Indexed Not found (404)│
+│ /test                  ✗ Not Indexed noindex         │
+│ /redirect              ✗ Not Indexed Page redirect   │
+└─────────────────────────────────────────────────────┘
+```
+
+The existing:
+
+```text
+Top 15 Landing Pages
+```
+
+must remain completely separate and unchanged.
+
+---
+
+# 37. Definition of Done
+
+The implementation is complete only when:
+
+- [ ] Existing Top 15 Landing Pages is unchanged.
+- [ ] New Indexing module exists separately.
+- [ ] Indexing URLs come independently from sitemap(s).
+- [ ] Sitemap indexes are supported.
+- [ ] Duplicate URLs are removed.
+- [ ] Google URL Inspection API is used.
+- [ ] Existing OAuth implementation is reused.
+- [ ] Google credentials remain server-side.
+- [ ] All discovered URLs can be tracked.
+- [ ] Indexed status is displayed.
+- [ ] Not Indexed status is displayed.
+- [ ] Actual Google coverage/reason is displayed when available.
+- [ ] Search/filter functionality works.
+- [ ] Pagination works.
+- [ ] URL details can be inspected.
+- [ ] Results are cached.
+- [ ] Refresh functionality works.
+- [ ] API quota is protected.
+- [ ] Inspection errors do not stop the entire scan.
+- [ ] Existing GSC functionality continues to work.
+- [ ] No Google Search Console page scraping is used.
+- [ ] No hard-coded indexing results are used.
+- [ ] No fake aggregate indexing counts are displayed.
